@@ -1,1 +1,1 @@
-# Sorteador-de-lazer-sem-decisao
+# Roleta do tedio
