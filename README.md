@@ -1,0 +1,1 @@
+# Sorteador-de-lazer-sem-decisao
