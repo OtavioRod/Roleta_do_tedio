@@ -1,11 +1,19 @@
+
 import { useState } from "react";
 
-import { Button, StyleSheet, Text, View } from "react-native";
+import {
+  Button,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function Index() {
   const [iniciou, setIniciou] = useState(false);
   const [tipo, setTipo] = useState("");
   const [humor, setHumor] = useState("");
+  const [modoEscuro, setModoEscuro] = useState(false);
 
   function comecar() {
     setIniciou(true);
@@ -19,13 +27,30 @@ export default function Index() {
     setHumor(valor);
   }
 
+  function alternarTema() {
+    setModoEscuro(!modoEscuro);
+  }
+
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        modoEscuro ? styles.containerEscuro : styles.containerClaro,
+      ]}
+    >
+      <TouchableOpacity style={styles.botaoTema} onPress={alternarTema}>
+        <Text style={styles.iconeTema}>
+          {modoEscuro ? "☀" : "☾"}
+        </Text>
+      </TouchableOpacity>
+
       {!iniciou ? (
         <>
-          <Text style={styles.titulo}>Roleta do Tédio</Text>
+          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            Roleta do Tédio
+          </Text>
 
-          <Text style={styles.descricao}>
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
             Vocês se juntaram e mesmo assim não sabem o que fazer?
           </Text>
 
@@ -33,9 +58,11 @@ export default function Index() {
         </>
       ) : (
         <>
-          <Text style={styles.titulo}>Quem está jogando?</Text>
+          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            Quem está jogando?
+          </Text>
 
-          <Text style={styles.descricao}>
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
             Isso vai ajudar a gente a escolher o nível certo.
           </Text>
 
@@ -49,15 +76,19 @@ export default function Index() {
 
           <Button title="Sozinho" onPress={() => escolherTipo("sozinho")} />
 
-          <Text style={styles.resultado}>
-            {tipo !== "" ? `Você escolheu: ${tipo}` : ""}
+          <Text style={[styles.resultado, modoEscuro && styles.textoEscuro]}>
+            {tipo !== "" ? `Você escolheu: ${tipo} ` : ""}
           </Text>
 
           {tipo !== "" && (
             <>
-              <Text style={styles.titulo}>Como você está agora?</Text>
+              <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+                Como você está agora?
+              </Text>
 
-              <Text style={styles.descricao}>
+              <Text
+                style={[styles.descricao, modoEscuro && styles.textoEscuro]}
+              >
                 Seja sincero. A roleta precisa saber com quem está lidando.
               </Text>
 
@@ -91,8 +122,10 @@ export default function Index() {
                 onPress={() => escolherHumor("tanto faz")}
               />
 
-              <Text style={styles.resultado}>
-                {humor !== "" ? `Humor escolhido: ${humor}` : ""}
+              <Text
+                style={[styles.resultado, modoEscuro && styles.textoEscuro]}
+              >
+                {humor !== "" ? `Humor escolhido: ${humor} ` : ""}
               </Text>
             </>
           )}
@@ -109,6 +142,14 @@ const styles = StyleSheet.create({
     padding: 30,
   },
 
+  containerClaro: {
+    backgroundColor: "#ffffff",
+  },
+
+  containerEscuro: {
+    backgroundColor: "#121212",
+  },
+
   titulo: {
     fontSize: 28,
     fontWeight: "bold",
@@ -122,6 +163,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
+  textoEscuro: {
+    color: "#ffffff",
+  },
+
   espaco: {
     height: 10,
   },
@@ -132,4 +177,22 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
+
+  botaoTema: {
+    position: "absolute",
+    bottom: 25,
+    right: 25,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#eeeeee",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+  },
+
+  iconeTema: {
+    fontSize: 26,
+  },
 });
+
