@@ -10,22 +10,23 @@ import {
 } from "react-native";
 import ParticipanteItem from "../components/ParticipanteItem";
 
+type Participante = {
+  nome: string;
+  humor: string;
+  gasto: string;
+  disposicao: string;
+};
+
 export default function Index() {
   const [iniciou, setIniciou] = useState(false);
-
   const [tipo, setTipo] = useState("");
-  const [humor, setHumor] = useState("");
-  const [gasto, setGasto] = useState("");
-
   const [salaCriada, setSalaCriada] = useState(false);
   const [codigoSala, setCodigoSala] = useState("");
-
   const [etapa, setEtapa] = useState("tipo");
-
   const [modoEscuro, setModoEscuro] = useState(false);
-
   const [nomeParticipante, setNomeParticipante] = useState("");
-  const [participantes, setParticipantes] = useState<string[]>([]);
+  const [participantes, setParticipantes] = useState<Participante[]>([]);
+  const [participanteAtual, setParticipanteAtual] = useState(0);
 
   function comecar() {
     setIniciou(true);
@@ -35,86 +36,173 @@ export default function Index() {
     setTipo(valor);
   }
 
-  function obterLimiteParticipantes() {
-    if (tipo === "sozinho") {
-      return 1;
-    }
-
-    if (tipo === "casal") {
-      return 2;
-    }
-
-    return 10;
-  }
-
   function criarSala() {
+    if (nomeParticipante.trim() === "") {
+      alert("Digite seu nome antes de criar a sala!");
+      return;
+    }
+
     const codigo = Math.random().toString(36).substring(2, 6).toUpperCase();
 
+    const participante: Participante = {
+      nome: nomeParticipante.trim(),
+      humor: "",
+      gasto: "",
+      disposicao: "",
+    };
+
     setCodigoSala(codigo);
+    setParticipantes([participante]);
+    setNomeParticipante("");
     setSalaCriada(true);
   }
 
   function continuar() {
-    setEtapa("humor");
-  }
-
-  function continuarSala() {
     const quantidade = participantes.length;
 
     if (tipo === "sozinho" && quantidade !== 1) {
-      alert("Você precisa adicionar seu nome para continuar.");
+      alert("No modo sozinho, deve existir exatamente 1 participante.");
       return;
     }
 
     if (tipo === "casal" && quantidade !== 2) {
-      alert("Um casal precisa ter 2 participantes.");
+      alert("No modo casal, precisamos de 2 participantes.");
       return;
     }
 
     if (tipo === "amigos" && (quantidade < 2 || quantidade > 10)) {
-      alert("A sala de amigos precisa ter entre 2 e 10 participantes.");
+      alert("No modo amigos, a sala precisa ter entre 2 e 10 participantes.");
       return;
     }
 
-    continuar();
+    setParticipanteAtual(0);
+    setEtapa("humor");
   }
 
   function escolherHumor(valor: string) {
-    setHumor(valor);
+    setParticipantes(
+      participantes.map((participante, index) =>
+        index === participanteAtual
+          ? {
+              ...participante,
+              humor: valor,
+            }
+          : participante,
+      ),
+    );
+
     setEtapa("humorEscolhido");
   }
 
   function escolherGasto(valor: string) {
-    setGasto(valor);
+    setParticipantes(
+      participantes.map((participante, index) =>
+        index === participanteAtual
+          ? {
+              ...participante,
+              gasto: valor,
+            }
+          : participante,
+      ),
+    );
+
     setEtapa("gastoEscolhido");
   }
 
+  function escolherDisposicao(valor: string) {
+    setParticipantes(
+      participantes.map((participante, index) =>
+        index === participanteAtual
+          ? {
+              ...participante,
+              disposicao: valor,
+            }
+          : participante,
+      ),
+    );
+
+    setEtapa("disposicaoEscolhida");
+  }
+
+  function proximoParticipante() {
+    if (participanteAtual < participantes.length - 1) {
+      setParticipanteAtual(participanteAtual + 1);
+      setEtapa("humor");
+      return;
+    }
+
+    setEtapa("resumo");
+  }
+
   function adicionarParticipante() {
-    if (nomeParticipante.trim() === "") {
+    const nome = nomeParticipante.trim();
+
+    if (nome === "") {
       alert("Digite o nome do participante!");
       return;
     }
 
-    const limite = obterLimiteParticipantes();
-
-    if (participantes.length >= limite) {
-      alert(`Essa sala permite no máximo ${limite} participante(s).`);
+    if (participantes.some((participante) => participante.nome === nome)) {
+      alert("Esse participante já está na sala!");
       return;
     }
 
-    setParticipantes([...participantes, nomeParticipante.trim()]);
+    if (tipo === "sozinho") {
+      alert("No modo sozinho, apenas você participa.");
+      return;
+    }
+
+    if (tipo === "casal" && participantes.length >= 2) {
+      alert("O modo casal permite apenas 2 participantes.");
+      return;
+    }
+
+    if (tipo === "amigos" && participantes.length >= 10) {
+      alert("O modo amigos permite no máximo 10 participantes.");
+      return;
+    }
+
+    const participante: Participante = {
+      nome,
+      humor: "",
+      gasto: "",
+      disposicao: "",
+    };
+
+    setParticipantes([...participantes, participante]);
 
     setNomeParticipante("");
   }
 
   function removerParticipante(nome: string) {
+    if (tipo === "sozinho") {
+      alert("Você não pode remover o único participante.");
+      return;
+    }
+
     setParticipantes(
-      participantes.filter((participante) => participante !== nome),
+      participantes.filter((participante) => participante.nome !== nome),
     );
   }
 
   function alternarTema() {
     setModoEscuro(!modoEscuro);
+  }
+
+  function podeContinuar() {
+    if (tipo === "sozinho") {
+      return participantes.length === 1;
+    }
+
+    if (tipo === "casal") {
+      return participantes.length === 2;
+    }
+
+    if (tipo === "amigos") {
+      return participantes.length >= 2 && participantes.length <= 10;
+    }
+
+    return false;
   }
 
   return (
@@ -124,13 +212,9 @@ export default function Index() {
         modoEscuro ? styles.containerEscuro : styles.containerClaro,
       ]}
     >
-      {/* BOTÃO DE TEMA */}
-
       <TouchableOpacity style={styles.botaoTema} onPress={alternarTema}>
         <Text style={styles.iconeTema}>{modoEscuro ? "☀" : "☾"}</Text>
       </TouchableOpacity>
-
-      {/* TELA INICIAL */}
 
       {!iniciou ? (
         <>
@@ -146,8 +230,6 @@ export default function Index() {
         </>
       ) : !salaCriada ? (
         <>
-          {/* ESCOLHA DO TIPO */}
-
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Quem está jogando?
           </Text>
@@ -174,7 +256,19 @@ export default function Index() {
                 Você escolheu: {tipo}
               </Text>
 
-              <View style={styles.espaco} />
+              <Text
+                style={[styles.descricao, modoEscuro && styles.textoEscuro]}
+              >
+                Antes de criar a sala, diga seu nome.
+              </Text>
+
+              <TextInput
+                style={[styles.input, modoEscuro && styles.inputEscuro]}
+                placeholder="Digite seu nome"
+                placeholderTextColor={modoEscuro ? "#aaaaaa" : "#666666"}
+                value={nomeParticipante}
+                onChangeText={setNomeParticipante}
+              />
 
               <Button title="Criar sala" onPress={criarSala} />
             </>
@@ -182,8 +276,6 @@ export default function Index() {
         </>
       ) : etapa === "tipo" ? (
         <>
-          {/* SALA */}
-
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Sala criada
           </Text>
@@ -196,56 +288,70 @@ export default function Index() {
             {codigoSala}
           </Text>
 
-          {/* PARTICIPANTES */}
-
           <Text style={[styles.subtitulo, modoEscuro && styles.textoEscuro]}>
             Participantes
           </Text>
 
-          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            {tipo === "sozinho"
-              ? "Você vai jogar sozinho."
-              : tipo === "casal"
-                ? "A sala precisa ter 2 participantes."
-                : "A sala pode ter de 2 a 10 participantes."}
+          <Text style={[styles.contador, modoEscuro && styles.textoEscuro]}>
+            {participantes.length}
+            {tipo === "sozinho" && " / 1"}
+            {tipo === "casal" && " / 2"}
+            {tipo === "amigos" && " / 10"}
           </Text>
 
-          <TextInput
-            style={[styles.input, modoEscuro && styles.inputEscuro]}
-            placeholder="Digite seu nome"
-            placeholderTextColor={modoEscuro ? "#aaaaaa" : "#666666"}
-            value={nomeParticipante}
-            onChangeText={setNomeParticipante}
-          />
+          {tipo !== "sozinho" && (
+            <>
+              <TextInput
+                style={[styles.input, modoEscuro && styles.inputEscuro]}
+                placeholder="Digite o nome do participante"
+                placeholderTextColor={modoEscuro ? "#aaaaaa" : "#666666"}
+                value={nomeParticipante}
+                onChangeText={setNomeParticipante}
+              />
 
-          <Button
-            title="Adicionar participante"
-            onPress={adicionarParticipante}
-          />
+              <Button
+                title="Adicionar participante"
+                onPress={adicionarParticipante}
+              />
+            </>
+          )}
 
           <FlatList
             data={participantes}
-            keyExtractor={(item, index) => `${item}-${index}`}
+            keyExtractor={(item, index) => `${item.nome}-${index}`}
             renderItem={({ item }) => (
               <ParticipanteItem
-                nome={item}
-                onRemover={() => removerParticipante(item)}
+                nome={item.nome}
+                onRemover={() => removerParticipante(item.nome)}
               />
             )}
             style={styles.lista}
           />
 
-          <Text style={[styles.resultado, modoEscuro && styles.textoEscuro]}>
-            {participantes.length} participante(s)
-          </Text>
+          {!podeContinuar() && (
+            <Text style={[styles.aviso, modoEscuro && styles.textoEscuro]}>
+              {tipo === "casal" &&
+                "Adicione mais 1 participante para continuar."}
 
-          <Button title="Continuar" onPress={continuarSala} />
+              {tipo === "amigos" &&
+                participantes.length < 2 &&
+                "Adicione pelo menos mais 1 participante para continuar."}
+            </Text>
+          )}
+
+          <Button
+            title="Continuar"
+            onPress={continuar}
+            disabled={!podeContinuar()}
+          />
         </>
       ) : etapa === "humor" ? (
         <>
-          {/* ESCOLHA DO HUMOR */}
-
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            {participantes[participanteAtual]?.nome}
+          </Text>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
             Como você está agora?
           </Text>
 
@@ -282,18 +388,16 @@ export default function Index() {
         </>
       ) : etapa === "humorEscolhido" ? (
         <>
-          {/* HUMOR ESCOLHIDO */}
-
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Resposta registrada
           </Text>
 
           <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            Você está:
+            {participantes[participanteAtual]?.nome}, você está:
           </Text>
 
           <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
-            {humor}
+            {participantes[participanteAtual]?.humor}
           </Text>
 
           <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
@@ -304,8 +408,6 @@ export default function Index() {
         </>
       ) : etapa === "gasto" ? (
         <>
-          {/* ESCOLHA DO ORÇAMENTO */}
-
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Quanto você pretende gastar?
           </Text>
@@ -338,25 +440,138 @@ export default function Index() {
             onPress={() => escolherGasto("sem limite definido")}
           />
         </>
-      ) : (
+      ) : etapa === "gastoEscolhido" ? (
         <>
-          {/* ORÇAMENTO ESCOLHIDO */}
-
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
-            Tudo certo
+            Resposta registrada
           </Text>
 
           <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            Seu orçamento:
+            {participantes[participanteAtual]?.nome}, seu orçamento é:
           </Text>
 
           <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
-            {gasto}
+            {participantes[participanteAtual]?.gasto}
+          </Text>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            Agora vamos descobrir sua disposição.
+          </Text>
+
+          <Button title="Continuar" onPress={() => setEtapa("disposicao")} />
+        </>
+      ) : etapa === "disposicao" ? (
+        <>
+          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            Qual é a sua disposição?
+          </Text>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            O quanto você está disposto a fazer alguma coisa hoje?
+          </Text>
+
+          <Button
+            title="Pouca disposição"
+            onPress={() => escolherDisposicao("baixa")}
+          />
+
+          <View style={styles.espaco} />
+
+          <Button
+            title="Disposto"
+            onPress={() => escolherDisposicao("media")}
+          />
+
+          <View style={styles.espaco} />
+
+          <Button
+            title="Muito disposto"
+            onPress={() => escolherDisposicao("alta")}
+          />
+        </>
+      ) : etapa === "disposicaoEscolhida" ? (
+        <>
+          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            Resposta registrada
+          </Text>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            {participantes[participanteAtual]?.nome}, sua disposição é:
+          </Text>
+
+          <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
+            {participantes[participanteAtual]?.disposicao}
+          </Text>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            {participanteAtual < participantes.length - 1
+              ? "Agora é a vez do próximo participante."
+              : "Todos os participantes já responderam."}
+          </Text>
+
+          <Button
+            title={
+              participanteAtual < participantes.length - 1
+                ? "Próximo participante"
+                : "Ver respostas"
+            }
+            onPress={proximoParticipante}
+          />
+        </>
+      ) : (
+        <>
+          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            Respostas
           </Text>
 
           <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
             Agora já sabemos um pouco mais sobre vocês.
           </Text>
+
+          <FlatList
+            data={participantes}
+            keyExtractor={(item, index) => `${item.nome}-${index}`}
+            renderItem={({ item }) => (
+              <View style={styles.resposta}>
+                <Text
+                  style={[
+                    styles.nomeResposta,
+                    modoEscuro && styles.textoEscuro,
+                  ]}
+                >
+                  {item.nome}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.textoResposta,
+                    modoEscuro && styles.textoEscuro,
+                  ]}
+                >
+                  Humor: {item.humor}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.textoResposta,
+                    modoEscuro && styles.textoEscuro,
+                  ]}
+                >
+                  Gasto: {item.gasto}
+                </Text>
+
+                <Text
+                  style={[
+                    styles.textoResposta,
+                    modoEscuro && styles.textoEscuro,
+                  ]}
+                >
+                  Disposição: {item.disposicao}
+                </Text>
+              </View>
+            )}
+            style={styles.lista}
+          />
 
           <Button title="Continuar" onPress={() => alert("Próxima etapa")} />
         </>
@@ -396,6 +611,12 @@ const styles = StyleSheet.create({
   subtitulo: {
     fontSize: 22,
     fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 5,
+  },
+
+  contador: {
+    fontSize: 18,
     textAlign: "center",
     marginBottom: 15,
   },
@@ -441,6 +662,31 @@ const styles = StyleSheet.create({
     maxHeight: 180,
     marginTop: 15,
     marginBottom: 15,
+  },
+
+  aviso: {
+    fontSize: 16,
+    textAlign: "center",
+    marginBottom: 10,
+  },
+
+  resposta: {
+    borderWidth: 1,
+    borderColor: "#999999",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+  },
+
+  nomeResposta: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+
+  textoResposta: {
+    fontSize: 16,
+    marginBottom: 3,
   },
 
   botaoTema: {
