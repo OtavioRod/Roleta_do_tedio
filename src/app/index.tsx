@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import ParticipanteItem from "../components/ParticipanteItem";
-import { Atividade, atividades } from "../data/atividades";
+import { Atividade, atividades, Gasto } from "../data/atividades";
 
 type Participante = {
   nome: string;
@@ -49,13 +49,17 @@ export default function Index() {
   const [nomeParticipante, setNomeParticipante] = useState("");
 
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+
   const [participanteAtual, setParticipanteAtual] = useState(0);
 
   const [atividadeEscolhida, setAtividadeEscolhida] =
     useState<Atividade | null>(null);
 
   const [latitude, setLatitude] = useState<number | null>(null);
+
   const [longitude, setLongitude] = useState<number | null>(null);
+
+  const [precisao, setPrecisao] = useState<number | null>(null);
 
   const [locais, setLocais] = useState<Local[]>([]);
 
@@ -84,7 +88,7 @@ export default function Index() {
     }
 
     if (tipo === "") {
-      alert("Calma aí. Primeiro precisamos saber quem está jogando.");
+      alert("Calma aí. Primeiro precisamos saber quem está participando.");
       return;
     }
 
@@ -206,6 +210,7 @@ export default function Index() {
   function proximoParticipante() {
     if (participanteAtual < participantes.length - 1) {
       setParticipanteAtual(participanteAtual + 1);
+
       setEtapa("humor");
       return;
     }
@@ -259,6 +264,7 @@ export default function Index() {
     };
 
     setParticipantes([...participantes, participante]);
+
     setNomeParticipante("");
   }
 
@@ -277,7 +283,7 @@ export default function Index() {
     setModoEscuro(!modoEscuro);
   }
 
-  function converterGasto(gasto: string) {
+  function converterGasto(gasto: string): Gasto | "" {
     if (gasto === "R$ 0") {
       return "nada";
     }
@@ -345,11 +351,18 @@ export default function Index() {
     for (const participante of participantes) {
       const gastoConvertido = converterGasto(participante.gasto);
 
-      if (!atividade.gasto.includes(gastoConvertido)) {
+      if (
+        gastoConvertido === "" ||
+        !atividade.gasto.includes(gastoConvertido)
+      ) {
         return false;
       }
 
-      if (!atividade.disposicao.includes(participante.disposicao)) {
+      if (
+        !atividade.disposicao.includes(
+          participante.disposicao as Atividade["disposicao"][number],
+        )
+      ) {
         return false;
       }
     }
@@ -368,28 +381,27 @@ export default function Index() {
 
     if (tempo >= atividade.tempoMinimo && tempo <= atividade.tempoMaximo) {
       pontos += 4;
+    } else if (tempo >= atividade.tempoMinimo) {
+      pontos += 2;
     }
 
     participantes.forEach((participante) => {
       const gastoConvertido = converterGasto(participante.gasto);
 
-      if (atividade.gasto.includes(gastoConvertido)) {
-        pontos += 2;
-      }
-
-      if (atividade.disposicao.includes(participante.disposicao)) {
+      if (gastoConvertido !== "" && atividade.gasto.includes(gastoConvertido)) {
         pontos += 2;
       }
 
       if (
-        participante.humor === "preguiça" &&
-        atividade.disposicao.includes("baixa")
+        atividade.disposicao.includes(
+          participante.disposicao as Atividade["disposicao"][number],
+        )
       ) {
         pontos += 2;
       }
 
       if (
-        participante.humor === "cansado" &&
+        participante.humor === "preguiça" &&
         atividade.disposicao.includes("baixa")
       ) {
         pontos += 2;
@@ -426,6 +438,10 @@ export default function Index() {
   }
 
   function escolherAtividade() {
+    if (carregandoRoleta) {
+      return;
+    }
+
     setCarregandoRoleta(true);
     setErroApi("");
 
@@ -434,19 +450,18 @@ export default function Index() {
     );
 
     if (atividadesValidas.length === 0) {
-      setCarregandoRoleta(false);
-
       const atividadeAlternativa =
         atividades[Math.floor(Math.random() * atividades.length)];
 
       setAtividadeEscolhida(atividadeAlternativa);
 
+      setCarregandoRoleta(false);
       setEtapa("resultado");
-
       return;
     }
 
     let maiorPontuacao = -1;
+
     let melhores: Atividade[] = [];
 
     atividadesValidas.forEach((atividade) => {
@@ -454,6 +469,7 @@ export default function Index() {
 
       if (pontuacao > maiorPontuacao) {
         maiorPontuacao = pontuacao;
+
         melhores = [atividade];
       } else if (pontuacao === maiorPontuacao) {
         melhores.push(atividade);
@@ -463,6 +479,7 @@ export default function Index() {
     const escolhida = melhores[Math.floor(Math.random() * melhores.length)];
 
     setAtividadeEscolhida(escolhida);
+
     setCarregandoRoleta(false);
     setEtapa("resultado");
   }
@@ -470,6 +487,7 @@ export default function Index() {
   async function buscarLocalizacao() {
     try {
       setCarregandoLocalizacao(true);
+
       setErroApi("");
 
       const permissao = await Location.requestForegroundPermissionsAsync();
@@ -480,17 +498,21 @@ export default function Index() {
       }
 
       const localizacao = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
       });
 
       const lat = localizacao.coords.latitude;
 
       const lon = localizacao.coords.longitude;
 
+      const precisaoObtida = localizacao.coords.accuracy;
+
       setLatitude(lat);
       setLongitude(lon);
+      setPrecisao(precisaoObtida ?? null);
 
       await buscarClima(lat, lon);
+
       await buscarLocais(lat, lon);
     } catch (erro) {
       setErroApi("Não foi possível obter sua localização.");
@@ -521,63 +543,86 @@ export default function Index() {
     }
   }
 
-  function obterCategoria() {
-    if (!atividadeEscolhida) {
-      return "";
-    }
-
-    return atividadeEscolhida.categoria;
-  }
-
   async function buscarLocais(lat: number, lon: number) {
     try {
       setCarregandoLocais(true);
+
       setErroApi("");
 
-      const apiKey = process.env.EXPO_PUBLIC_GEOAPIFY_KEY;
-
-      if (!apiKey) {
-        setErroApi("Chave da Geoapify não configurada.");
+      if (!atividadeEscolhida) {
         return;
       }
 
-      const categoria = obterCategoria();
-
-      if (!categoria) {
+      if (atividadeEscolhida.id !== "restaurante") {
+        setLocais([]);
         return;
       }
 
-      const url =
-        `https://api.geoapify.com/v2/places` +
-        `?categories=${categoria}` +
-        `&filter=circle:${lon},${lat},5000` +
-        `&bias=proximity:${lon},${lat}` +
-        `&limit=10` +
-        `&apiKey=${apiKey}`;
+      const consulta = `
+        [out:json];
+        (
+          nwr["amenity"="restaurant"](around:5000,${lat},${lon});
+          nwr["amenity"="fast_food"](around:5000,${lat},${lon});
+        );
+        out center;
+      `;
+
+      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(
+        consulta,
+      )}`;
 
       const resposta = await fetch(url);
 
       if (!resposta.ok) {
-        throw new Error("Erro ao buscar locais");
+        throw new Error("Erro ao buscar restaurantes");
       }
 
       const dados = await resposta.json();
 
-      const resultados: Local[] = dados.features
-        .filter(
-          (item: any) => item.geometry?.coordinates && item.properties?.name,
-        )
-        .map((item: any, index: number) => ({
-          id: item.properties.place_id || `${index}`,
-          nome: item.properties.name,
-          latitude: item.geometry.coordinates[1],
-          longitude: item.geometry.coordinates[0],
-          endereco: item.properties.formatted || "Endereço não informado",
-        }));
+      const resultados: Local[] = dados.elements
+        .map((item: any, index: number) => {
+          const itemLatitude = item.lat ?? item.center?.lat;
+
+          const itemLongitude = item.lon ?? item.center?.lon;
+
+          const nome = item.tags?.name;
+
+          if (
+            itemLatitude === undefined ||
+            itemLongitude === undefined ||
+            !nome
+          ) {
+            return null;
+          }
+
+          const endereco = [
+            item.tags?.["addr:street"],
+            item.tags?.["addr:housenumber"],
+            item.tags?.["addr:city"],
+          ]
+            .filter(Boolean)
+            .join(", ");
+
+          return {
+            id: String(item.id) || `${index}`,
+            nome,
+            latitude: itemLatitude,
+            longitude: itemLongitude,
+            endereco: endereco || "Endereço não informado",
+          };
+        })
+        .filter((item: Local | null): item is Local => item !== null)
+        .slice(0, 20);
 
       setLocais(resultados);
+
+      if (resultados.length === 0) {
+        setErroApi(
+          "Nenhum restaurante foi encontrado próximo da localização informada.",
+        );
+      }
     } catch (erro) {
-      setErroApi("Não foi possível buscar locais próximos.");
+      setErroApi("Não foi possível buscar restaurantes próximos.");
     } finally {
       setCarregandoLocais(false);
     }
@@ -587,6 +632,9 @@ export default function Index() {
     setLocais([]);
     setClima(null);
     setErroApi("");
+    setLatitude(null);
+    setLongitude(null);
+    setPrecisao(null);
 
     setEtapa("localizacao");
 
@@ -617,9 +665,13 @@ export default function Index() {
     setAtividadeEscolhida(null);
     setLatitude(null);
     setLongitude(null);
+    setPrecisao(null);
     setLocais([]);
     setClima(null);
     setErroApi("");
+    setCarregandoRoleta(false);
+    setCarregandoLocalizacao(false);
+    setCarregandoLocais(false);
   }
 
   function Mapa({
@@ -1149,7 +1201,7 @@ export default function Index() {
               </Text>
 
               <Button
-                title="Encontrar opções próximas"
+                title="Visualizar no mapa"
                 onPress={continuarParaLocalizacao}
               />
 
@@ -1178,7 +1230,9 @@ export default function Index() {
                 Atividade escolhida
               </Text>
 
-              <Text style={modoEscuro && styles.textoEscuro}>
+              <Text
+                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+              >
                 {atividadeEscolhida.nome}
               </Text>
             </View>
@@ -1194,6 +1248,36 @@ export default function Index() {
             </View>
           )}
 
+          {latitude !== null && longitude !== null && (
+            <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
+              <Text
+                style={[styles.cardTitulo, modoEscuro && styles.textoEscuro]}
+              >
+                Localização encontrada
+              </Text>
+
+              <Text
+                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+              >
+                Latitude: {latitude.toFixed(6)}
+              </Text>
+
+              <Text
+                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+              >
+                Longitude: {longitude.toFixed(6)}
+              </Text>
+
+              {precisao !== null && (
+                <Text
+                  style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+                >
+                  Precisão aproximada: {Math.round(precisao)} metros
+                </Text>
+              )}
+            </View>
+          )}
+
           {clima && (
             <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
               <Text
@@ -1202,11 +1286,16 @@ export default function Index() {
                 Clima atual
               </Text>
 
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Temperatura: {clima.temperatura}°C
+              <Text
+                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+              >
+                Temperatura: {clima.temperatura}
+                °C
               </Text>
 
-              <Text style={modoEscuro && styles.textoEscuro}>
+              <Text
+                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+              >
                 Precipitação: {clima.chuva} mm
               </Text>
 
@@ -1229,7 +1318,7 @@ export default function Index() {
               <ActivityIndicator />
 
               <Text style={modoEscuro && styles.textoEscuro}>
-                Procurando opções próximas...
+                Procurando restaurantes próximos...
               </Text>
             </View>
           )}
@@ -1239,7 +1328,7 @@ export default function Index() {
               <Text
                 style={[styles.cardTitulo, modoEscuro && styles.textoEscuro]}
               >
-                Opções próximas
+                Restaurantes próximos
               </Text>
 
               <FlatList
@@ -1258,7 +1347,12 @@ export default function Index() {
                       {item.nome}
                     </Text>
 
-                    <Text style={modoEscuro && styles.textoEscuro}>
+                    <Text
+                      style={[
+                        styles.textoCard,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
                       {item.endereco}
                     </Text>
                   </View>
@@ -1271,6 +1365,13 @@ export default function Index() {
             <View style={styles.mapa}>
               <Mapa latitude={latitude} longitude={longitude} locais={locais} />
             </View>
+          )}
+
+          {Platform.OS !== "web" && (
+            <Text style={[styles.aviso, modoEscuro && styles.textoEscuro]}>
+              O mapa interativo está disponível atualmente na versão Web. Os
+              locais encontrados continuam disponíveis acima.
+            </Text>
           )}
 
           <View style={styles.espacoGrande}>
@@ -1343,6 +1444,11 @@ const styles = StyleSheet.create({
 
   textoEscuro: {
     color: "#ffffff",
+  },
+
+  textoCard: {
+    fontSize: 16,
+    marginBottom: 5,
   },
 
   espaco: {
