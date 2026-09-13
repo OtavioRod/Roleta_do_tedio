@@ -4,15 +4,36 @@ import {
   ActivityIndicator,
   Button,
   FlatList,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
 import ParticipanteItem from "../components/ParticipanteItem";
-import { Atividade, atividades, Gasto } from "../data/atividades";
+import ResultadoEventos from "../components/ResultadoEventos";
+import ResultadoFilmes from "../components/ResultadoFilmes";
+import ResultadoJogos from "../components/ResultadoJogos";
+import ResultadoLocais from "../components/ResultadoLocais";
+import ResultadoReceitas from "../components/ResultadoReceitas";
+
+import { Atividade, atividades, Gasto, Modalidade } from "../data/atividades";
+
+import { Jogo, jogos } from "../data/jogos";
+
+import { buscarLocais, Local } from "../services/overpass";
+
+import {
+  buscarClima as buscarClimaService,
+  Clima,
+} from "../services/openMeteo";
+
+import { buscarReceitas, Receita } from "../services/receitas";
+
+import { buscarFilmes, Filme } from "../services/filmes";
+
+import { buscarEventos, Evento } from "../services/eventos";
 
 type Participante = {
   nome: string;
@@ -20,20 +41,6 @@ type Participante = {
   gasto: string;
   disposicao: string;
   tempo: string;
-};
-
-type Local = {
-  id: string;
-  nome: string;
-  latitude: number;
-  longitude: number;
-  endereco: string;
-};
-
-type Clima = {
-  temperatura: number;
-  chuva: number;
-  codigo: number;
 };
 
 export default function Index() {
@@ -55,6 +62,9 @@ export default function Index() {
   const [atividadeEscolhida, setAtividadeEscolhida] =
     useState<Atividade | null>(null);
 
+  const [modalidadeEscolhida, setModalidadeEscolhida] =
+    useState<Modalidade | null>(null);
+
   const [latitude, setLatitude] = useState<number | null>(null);
 
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -65,9 +75,25 @@ export default function Index() {
 
   const [clima, setClima] = useState<Clima | null>(null);
 
+  const [filmes, setFilmes] = useState<Filme[]>([]);
+
+  const [eventos, setEventos] = useState<Evento[]>([]);
+
+  const [receitas, setReceitas] = useState<Receita[]>([]);
+
+  const [jogosFiltrados, setJogosFiltrados] = useState<Jogo[]>([]);
+
   const [carregandoLocalizacao, setCarregandoLocalizacao] = useState(false);
 
   const [carregandoLocais, setCarregandoLocais] = useState(false);
+
+  const [carregandoFilmes, setCarregandoFilmes] = useState(false);
+
+  const [carregandoEventos, setCarregandoEventos] = useState(false);
+
+  const [carregandoReceitas, setCarregandoReceitas] = useState(false);
+
+  const [carregandoJogos, setCarregandoJogos] = useState(false);
 
   const [carregandoRoleta, setCarregandoRoleta] = useState(false);
 
@@ -444,6 +470,7 @@ export default function Index() {
 
     setCarregandoRoleta(true);
     setErroApi("");
+    setModalidadeEscolhida(null);
 
     const atividadesValidas = atividades.filter((atividade) =>
       atividadePodeSerEscolhida(atividade),
@@ -484,6 +511,511 @@ export default function Index() {
     setEtapa("resultado");
   }
 
+  function calcularModalidadeCafe() {
+    if (!atividadeEscolhida?.modalidades) {
+      return null;
+    }
+
+    const modalidades = atividadeEscolhida.modalidades;
+
+    const tempo = menorTempoDisponivel();
+
+    let melhorModalidade: Modalidade | null = null;
+
+    let maiorPontuacao = -1;
+
+    modalidades.forEach((modalidade) => {
+      let pontos = 0;
+
+      if (tempo >= modalidade.tempoMinimo && tempo <= modalidade.tempoMaximo) {
+        pontos += 4;
+      } else if (tempo >= modalidade.tempoMinimo) {
+        pontos += 1;
+      } else {
+        return;
+      }
+
+      participantes.forEach((participante) => {
+        const gasto = converterGasto(participante.gasto);
+
+        if (gasto !== "" && modalidade.gasto.includes(gasto)) {
+          pontos += 3;
+        }
+
+        if (
+          modalidade.disposicao.includes(
+            participante.disposicao as Modalidade["disposicao"][number],
+          )
+        ) {
+          pontos += 3;
+        }
+
+        if (
+          participante.humor === "preguiça" &&
+          modalidade.disposicao.includes("baixa")
+        ) {
+          pontos += 2;
+        }
+
+        if (
+          participante.humor === "animado" &&
+          modalidade.disposicao.includes("alta")
+        ) {
+          pontos += 2;
+        }
+
+        if (participante.humor === "tanto faz") {
+          pontos += 1;
+        }
+
+        if (participante.gasto === "R$ 0" && modalidade.id === "cafe-casa") {
+          pontos += 4;
+        }
+
+        if (
+          participante.disposicao === "baixa" &&
+          modalidade.id === "cafe-casa"
+        ) {
+          pontos += 3;
+        }
+      });
+
+      if (pontos > maiorPontuacao) {
+        maiorPontuacao = pontos;
+
+        melhorModalidade = modalidade;
+      }
+    });
+
+    return melhorModalidade;
+  }
+
+  async function calcularModalidadeCafeComClima(lat: number, lon: number) {
+    try {
+      const climaAtual = await buscarClimaService(lat, lon);
+
+      setClima(climaAtual);
+
+      const modalidades = atividadeEscolhida?.modalidades ?? [];
+
+      let melhor: Modalidade | null = null;
+
+      let maiorPontuacao = -1;
+
+      const tempo = menorTempoDisponivel();
+
+      modalidades.forEach((modalidade) => {
+        let pontos = 0;
+
+        if (tempo < modalidade.tempoMinimo) {
+          return;
+        }
+
+        if (
+          tempo >= modalidade.tempoMinimo &&
+          tempo <= modalidade.tempoMaximo
+        ) {
+          pontos += 4;
+        } else {
+          pontos += 1;
+        }
+
+        participantes.forEach((participante) => {
+          const gasto = converterGasto(participante.gasto);
+
+          if (gasto !== "" && modalidade.gasto.includes(gasto)) {
+            pontos += 3;
+          }
+
+          if (
+            modalidade.disposicao.includes(
+              participante.disposicao as Modalidade["disposicao"][number],
+            )
+          ) {
+            pontos += 3;
+          }
+
+          if (
+            participante.humor === "preguiça" &&
+            modalidade.disposicao.includes("baixa")
+          ) {
+            pontos += 2;
+          }
+
+          if (
+            participante.humor === "animado" &&
+            modalidade.disposicao.includes("alta")
+          ) {
+            pontos += 2;
+          }
+
+          if (participante.humor === "tanto faz") {
+            pontos += 1;
+          }
+
+          if (participante.gasto === "R$ 0" && modalidade.id === "cafe-casa") {
+            pontos += 5;
+          }
+
+          if (
+            participante.disposicao === "baixa" &&
+            modalidade.id === "cafe-casa"
+          ) {
+            pontos += 3;
+          }
+
+          if (
+            participante.disposicao === "alta" &&
+            modalidade.id === "cafe-fora"
+          ) {
+            pontos += 3;
+          }
+        });
+
+        if (climaAtual.chuva > 0 && modalidade.id === "cafe-casa") {
+          pontos += 5;
+        }
+
+        if (climaAtual.chuva === 0 && modalidade.id === "cafe-fora") {
+          pontos += 3;
+        }
+
+        if (climaAtual.chuva > 0 && modalidade.id === "cafe-fora") {
+          pontos -= 3;
+        }
+
+        if (pontos > maiorPontuacao) {
+          maiorPontuacao = pontos;
+
+          melhor = modalidade;
+        }
+      });
+
+      return melhor;
+    } catch (erro) {
+      return calcularModalidadeCafe();
+    }
+  }
+
+  async function buscarClima(lat: number, lon: number) {
+    try {
+      const climaAtual = await buscarClimaService(lat, lon);
+
+      setClima(climaAtual);
+
+      return climaAtual;
+    } catch (erro) {
+      setErroApi("Não foi possível consultar o clima.");
+
+      return null;
+    }
+  }
+
+  function obterTipoLocal() {
+    if (!atividadeEscolhida) {
+      return null;
+    }
+
+    if (atividadeEscolhida.id === "restaurante") {
+      return "restaurante" as const;
+    }
+
+    if (atividadeEscolhida.id === "cafe") {
+      if (modalidadeEscolhida?.id !== "cafe-fora") {
+        return null;
+      }
+
+      return "cafe" as const;
+    }
+
+    if (atividadeEscolhida.id === "cinema") {
+      return "cinema" as const;
+    }
+
+    if (atividadeEscolhida.id === "parque") {
+      return "parque" as const;
+    }
+
+    if (atividadeEscolhida.id === "passeio") {
+      return "passeio" as const;
+    }
+
+    return null;
+  }
+
+  function precisaDeLocalizacao() {
+    if (!atividadeEscolhida) {
+      return false;
+    }
+
+    if (atividadeEscolhida.id === "restaurante") {
+      return true;
+    }
+
+    if (atividadeEscolhida.id === "cafe") {
+      return true;
+    }
+
+    if (atividadeEscolhida.id === "cinema") {
+      return true;
+    }
+
+    if (atividadeEscolhida.id === "parque") {
+      return true;
+    }
+
+    if (atividadeEscolhida.id === "passeio") {
+      return true;
+    }
+
+    if (atividadeEscolhida.id === "evento") {
+      return true;
+    }
+
+    return false;
+  }
+
+  async function buscarLocaisProximos(lat: number, lon: number) {
+    const tipoLocal = obterTipoLocal();
+
+    if (!tipoLocal) {
+      setLocais([]);
+      return;
+    }
+
+    try {
+      setCarregandoLocais(true);
+
+      setErroApi("");
+
+      const resultados = await buscarLocais(lat, lon, tipoLocal);
+
+      setLocais(resultados);
+
+      if (resultados.length === 0) {
+        setErroApi(
+          "Nenhuma opção foi encontrada próxima da localização informada.",
+        );
+      }
+    } catch (erro) {
+      setErroApi("Não foi possível buscar opções próximas.");
+    } finally {
+      setCarregandoLocais(false);
+    }
+  }
+
+  async function buscarFilmesResultado() {
+    try {
+      setCarregandoFilmes(true);
+
+      setErroApi("");
+
+      const resultados = await buscarFilmes(8);
+
+      setFilmes(resultados);
+
+      if (resultados.length === 0) {
+        setErroApi("Não encontramos filmes disponíveis para mostrar.");
+      }
+    } catch (erro) {
+      setErroApi("Não foi possível consultar os filmes.");
+    } finally {
+      setCarregandoFilmes(false);
+    }
+  }
+
+  async function buscarReceitasResultado() {
+    try {
+      setCarregandoReceitas(true);
+
+      setErroApi("");
+
+      const resultados = await buscarReceitas(6);
+
+      setReceitas(resultados);
+
+      if (resultados.length === 0) {
+        setErroApi("Não encontramos receitas disponíveis.");
+      }
+    } catch (erro) {
+      setErroApi("Não foi possível consultar as receitas.");
+    } finally {
+      setCarregandoReceitas(false);
+    }
+  }
+
+  function jogoCombinaComParticipantes(jogo: Jogo) {
+    const quantidade = participantes.length;
+
+    if (
+      quantidade < jogo.jogadoresMinimos ||
+      quantidade > jogo.jogadoresMaximos
+    ) {
+      return false;
+    }
+
+    const tempo = menorTempoDisponivel();
+
+    if (jogo.tempo > tempo) {
+      return false;
+    }
+
+    for (const participante of participantes) {
+      const gasto = converterGasto(participante.gasto);
+
+      if (gasto === "nada" && jogo.gasto !== "nada") {
+        return false;
+      }
+
+      if (gasto === "pouco" && jogo.gasto === "medio") {
+        return false;
+      }
+
+      if (
+        participante.disposicao === "baixa" &&
+        jogo.dificuldade === "Difícil"
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  function ordenarJogos(lista: Jogo[]) {
+    return [...lista].sort((a, b) => {
+      let pontosA = 0;
+      let pontosB = 0;
+
+      const tempo = menorTempoDisponivel();
+
+      if (a.tempo <= tempo) {
+        pontosA += 2;
+      }
+
+      if (b.tempo <= tempo) {
+        pontosB += 2;
+      }
+
+      participantes.forEach((participante) => {
+        if (participante.disposicao === "baixa" && a.dificuldade === "Fácil") {
+          pontosA += 2;
+        }
+
+        if (participante.disposicao === "baixa" && b.dificuldade === "Fácil") {
+          pontosB += 2;
+        }
+
+        if (participante.disposicao === "alta" && a.dificuldade === "Difícil") {
+          pontosA += 2;
+        }
+
+        if (participante.disposicao === "alta" && b.dificuldade === "Difícil") {
+          pontosB += 2;
+        }
+      });
+
+      return pontosB - pontosA;
+    });
+  }
+
+  function prepararJogos() {
+    setCarregandoJogos(true);
+
+    const filtrados = jogos.filter(jogoCombinaComParticipantes);
+
+    const ordenados = ordenarJogos(filtrados.length > 0 ? filtrados : jogos);
+
+    setJogosFiltrados(ordenados.slice(0, 8));
+
+    setCarregandoJogos(false);
+  }
+
+  async function obterCidadeAtual(lat: number, lon: number) {
+    try {
+      const enderecos = await Location.reverseGeocodeAsync({
+        latitude: lat,
+        longitude: lon,
+      });
+
+      if (enderecos.length > 0) {
+        return enderecos[0].city ?? enderecos[0].district ?? "Saquarema";
+      }
+    } catch (erro) {
+      return "Saquarema";
+    }
+
+    return "Saquarema";
+  }
+
+  async function buscarEventosResultado(lat: number, lon: number) {
+    try {
+      setCarregandoEventos(true);
+
+      setErroApi("");
+
+      const cidade = await obterCidadeAtual(lat, lon);
+
+      const resultados = await buscarEventos(cidade, 10);
+
+      setEventos(resultados);
+
+      if (resultados.length === 0) {
+        setErroApi(`Não encontramos eventos cadastrados para ${cidade}.`);
+      }
+    } catch (erro) {
+      setErroApi("Não foi possível consultar eventos próximos.");
+    } finally {
+      setCarregandoEventos(false);
+    }
+  }
+
+  async function continuarDepoisResultado() {
+    if (!atividadeEscolhida) {
+      return;
+    }
+
+    setErroApi("");
+
+    if (atividadeEscolhida.id === "jogar") {
+      prepararJogos();
+
+      setEtapa("resultadoJogos");
+
+      return;
+    }
+
+    if (atividadeEscolhida.id === "filme-casa") {
+      setFilmes([]);
+
+      setEtapa("resultadoFilmes");
+
+      await buscarFilmesResultado();
+
+      return;
+    }
+
+    if (atividadeEscolhida.id === "evento") {
+      setEventos([]);
+
+      setEtapa("localizacao");
+
+      await buscarLocalizacao();
+
+      return;
+    }
+
+    if (precisaDeLocalizacao()) {
+      setEtapa("localizacao");
+
+      await buscarLocalizacao();
+
+      return;
+    }
+
+    setEtapa("resultado");
+  }
+
   async function buscarLocalizacao() {
     try {
       setCarregandoLocalizacao(true);
@@ -493,7 +1025,9 @@ export default function Index() {
       const permissao = await Location.requestForegroundPermissionsAsync();
 
       if (permissao.status !== "granted") {
-        setErroApi("Permissão de localização não concedida.");
+        setErroApi(
+          "Permissão de localização não concedida. Autorize a localização para encontrar opções próximas.",
+        );
         return;
       }
 
@@ -509,136 +1043,85 @@ export default function Index() {
 
       setLatitude(lat);
       setLongitude(lon);
+
       setPrecisao(precisaoObtida ?? null);
 
-      await buscarClima(lat, lon);
+      if (atividadeEscolhida?.id === "cafe") {
+        const climaAtual = await buscarClima(lat, lon);
 
-      await buscarLocais(lat, lon);
+        const modalidade = climaAtual
+          ? await calcularModalidadeCafeComClima(lat, lon)
+          : calcularModalidadeCafe();
+
+        setModalidadeEscolhida(modalidade);
+
+        if (modalidade?.id === "cafe-casa") {
+          setLocais([]);
+          setReceitas([]);
+
+          setEtapa("resultadoModalidade");
+
+          await buscarReceitasResultado();
+
+          return;
+        }
+
+        if (modalidade?.id === "cafe-fora") {
+          await buscarLocaisProximos(lat, lon);
+
+          return;
+        }
+      }
+
+      if (atividadeEscolhida?.id === "evento") {
+        setLocais([]);
+        setEventos([]);
+
+        await buscarEventosResultado(lat, lon);
+
+        setEtapa("resultadoEventos");
+
+        return;
+      }
+
+      if (atividadeEscolhida?.id === "cinema") {
+        setLocais([]);
+        setFilmes([]);
+
+        await buscarLocaisProximos(lat, lon);
+
+        await buscarFilmesResultado();
+
+        return;
+      }
+
+      await buscarLocaisProximos(lat, lon);
     } catch (erro) {
-      setErroApi("Não foi possível obter sua localização.");
+      setErroApi(
+        "Não foi possível obter sua localização. Verifique se o GPS está disponível e tente novamente.",
+      );
     } finally {
       setCarregandoLocalizacao(false);
-    }
-  }
-
-  async function buscarClima(lat: number, lon: number) {
-    try {
-      const resposta = await fetch(
-        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,precipitation,weather_code&timezone=auto`,
-      );
-
-      if (!resposta.ok) {
-        throw new Error("Erro ao buscar clima");
-      }
-
-      const dados = await resposta.json();
-
-      setClima({
-        temperatura: dados.current.temperature_2m,
-        chuva: dados.current.precipitation,
-        codigo: dados.current.weather_code,
-      });
-    } catch (erro) {
-      setErroApi("Não foi possível consultar o clima.");
-    }
-  }
-
-  async function buscarLocais(lat: number, lon: number) {
-    try {
-      setCarregandoLocais(true);
-
-      setErroApi("");
-
-      if (!atividadeEscolhida) {
-        return;
-      }
-
-      if (atividadeEscolhida.id !== "restaurante") {
-        setLocais([]);
-        return;
-      }
-
-      const consulta = `
-        [out:json];
-        (
-          nwr["amenity"="restaurant"](around:5000,${lat},${lon});
-          nwr["amenity"="fast_food"](around:5000,${lat},${lon});
-        );
-        out center;
-      `;
-
-      const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(
-        consulta,
-      )}`;
-
-      const resposta = await fetch(url);
-
-      if (!resposta.ok) {
-        throw new Error("Erro ao buscar restaurantes");
-      }
-
-      const dados = await resposta.json();
-
-      const resultados: Local[] = dados.elements
-        .map((item: any, index: number) => {
-          const itemLatitude = item.lat ?? item.center?.lat;
-
-          const itemLongitude = item.lon ?? item.center?.lon;
-
-          const nome = item.tags?.name;
-
-          if (
-            itemLatitude === undefined ||
-            itemLongitude === undefined ||
-            !nome
-          ) {
-            return null;
-          }
-
-          const endereco = [
-            item.tags?.["addr:street"],
-            item.tags?.["addr:housenumber"],
-            item.tags?.["addr:city"],
-          ]
-            .filter(Boolean)
-            .join(", ");
-
-          return {
-            id: String(item.id) || `${index}`,
-            nome,
-            latitude: itemLatitude,
-            longitude: itemLongitude,
-            endereco: endereco || "Endereço não informado",
-          };
-        })
-        .filter((item: Local | null): item is Local => item !== null)
-        .slice(0, 20);
-
-      setLocais(resultados);
-
-      if (resultados.length === 0) {
-        setErroApi(
-          "Nenhum restaurante foi encontrado próximo da localização informada.",
-        );
-      }
-    } catch (erro) {
-      setErroApi("Não foi possível buscar restaurantes próximos.");
-    } finally {
-      setCarregandoLocais(false);
     }
   }
 
   function continuarParaLocalizacao() {
     setLocais([]);
     setClima(null);
+    setFilmes([]);
+    setEventos([]);
+    setReceitas([]);
+    setJogosFiltrados([]);
     setErroApi("");
     setLatitude(null);
     setLongitude(null);
     setPrecisao(null);
 
-    setEtapa("localizacao");
+    if (atividadeEscolhida?.id !== "cafe") {
+      setModalidadeEscolhida(null);
+    }
 
-    buscarLocalizacao();
+    continuarDepoisResultado();
   }
 
   function climaPermiteAtividade() {
@@ -663,31 +1146,24 @@ export default function Index() {
     setParticipantes([]);
     setParticipanteAtual(0);
     setAtividadeEscolhida(null);
+    setModalidadeEscolhida(null);
     setLatitude(null);
     setLongitude(null);
     setPrecisao(null);
     setLocais([]);
     setClima(null);
+    setFilmes([]);
+    setEventos([]);
+    setReceitas([]);
+    setJogosFiltrados([]);
     setErroApi("");
     setCarregandoRoleta(false);
     setCarregandoLocalizacao(false);
     setCarregandoLocais(false);
-  }
-
-  function Mapa({
-    latitude,
-    longitude,
-    locais,
-  }: {
-    latitude: number;
-    longitude: number;
-    locais: Local[];
-  }) {
-    const MapLeaflet = require("../components/MapaLeaflet").default;
-
-    return (
-      <MapLeaflet latitude={latitude} longitude={longitude} locais={locais} />
-    );
+    setCarregandoFilmes(false);
+    setCarregandoEventos(false);
+    setCarregandoReceitas(false);
+    setCarregandoJogos(false);
   }
 
   const participante = participantes[participanteAtual];
@@ -1201,7 +1677,19 @@ export default function Index() {
               </Text>
 
               <Button
-                title="Visualizar no mapa"
+                title={
+                  atividadeEscolhida?.id === "filme-casa"
+                    ? "Escolher filme"
+                    : atividadeEscolhida?.id === "jogar"
+                      ? "Ver sugestões"
+                      : atividadeEscolhida?.id === "evento"
+                        ? "Encontrar eventos"
+                        : atividadeEscolhida?.id === "cinema"
+                          ? "Encontrar cinemas e filmes"
+                          : atividadeEscolhida?.id === "cafe"
+                            ? "Descobrir a melhor opção"
+                            : "Encontrar opções próximas"
+                }
                 onPress={continuarParaLocalizacao}
               />
 
@@ -1210,6 +1698,158 @@ export default function Index() {
               <Button title="Girar novamente" onPress={escolherAtividade} />
             </>
           )}
+        </View>
+      ) : etapa === "resultadoModalidade" ? (
+        <View>
+          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            A Roleta pensou um pouco mais...
+          </Text>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            A atividade escolhida foi:
+          </Text>
+
+          <View
+            style={[
+              styles.resultadoCard,
+              modoEscuro && styles.resultadoCardEscuro,
+            ]}
+          >
+            <Text
+              style={[styles.resultadoTitulo, modoEscuro && styles.textoEscuro]}
+            >
+              ☕ {atividadeEscolhida?.nome}
+            </Text>
+
+            <Text
+              style={[
+                styles.resultadoDescricao,
+                modoEscuro && styles.textoEscuro,
+              ]}
+            >
+              {modalidadeEscolhida?.nome}
+            </Text>
+
+            <Text style={[styles.textoCard, modoEscuro && styles.textoEscuro]}>
+              {modalidadeEscolhida?.descricao}
+            </Text>
+          </View>
+
+          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            Pelo tempo, disposição, dinheiro e clima de vocês, parece que essa é
+            a opção que faz mais sentido agora.
+          </Text>
+
+          {carregandoReceitas ? (
+            <View style={styles.carregando}>
+              <ActivityIndicator />
+
+              <Text style={modoEscuro && styles.textoEscuro}>
+                Procurando ideias para o café...
+              </Text>
+            </View>
+          ) : (
+            <ResultadoReceitas
+              receitas={receitas}
+              titulo="Ideias para preparar"
+              subtitulo="Algumas receitas para transformar o café em um pequeno evento."
+            />
+          )}
+
+          {erroApi !== "" && (
+            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+              {erroApi}
+            </Text>
+          )}
+
+          <View style={styles.espacoGrande} />
+
+          <Button title="Começar novamente" onPress={reiniciar} />
+        </View>
+      ) : etapa === "resultadoFilmes" ? (
+        <View>
+          {carregandoFilmes ? (
+            <View style={styles.carregando}>
+              <ActivityIndicator size="large" />
+
+              <Text style={modoEscuro && styles.textoEscuro}>
+                Procurando filmes...
+              </Text>
+            </View>
+          ) : (
+            <ResultadoFilmes
+              filmes={filmes}
+              titulo="Escolha um filme"
+              subtitulo="A decisão já foi tomada. Agora só falta escolher o filme."
+              mostrarCategorias
+            />
+          )}
+
+          {erroApi !== "" && (
+            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+              {erroApi}
+            </Text>
+          )}
+
+          <View style={styles.espacoGrande} />
+
+          <Button title="Começar novamente" onPress={reiniciar} />
+        </View>
+      ) : etapa === "resultadoJogos" ? (
+        <View>
+          {carregandoJogos ? (
+            <View style={styles.carregando}>
+              <ActivityIndicator size="large" />
+
+              <Text style={modoEscuro && styles.textoEscuro}>
+                Separando os jogos...
+              </Text>
+            </View>
+          ) : (
+            <ResultadoJogos
+              jogos={jogosFiltrados}
+              titulo="Hora de jogar"
+              subtitulo="Filtramos as opções de acordo com o número de pessoas, tempo, dinheiro e disposição."
+            />
+          )}
+
+          {erroApi !== "" && (
+            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+              {erroApi}
+            </Text>
+          )}
+
+          <View style={styles.espacoGrande} />
+
+          <Button title="Começar novamente" onPress={reiniciar} />
+        </View>
+      ) : etapa === "resultadoEventos" ? (
+        <View>
+          {carregandoEventos ? (
+            <View style={styles.carregando}>
+              <ActivityIndicator size="large" />
+
+              <Text style={modoEscuro && styles.textoEscuro}>
+                Procurando eventos...
+              </Text>
+            </View>
+          ) : (
+            <ResultadoEventos
+              eventos={eventos}
+              titulo="O que está acontecendo por aí?"
+              subtitulo="Encontramos alguns eventos que podem combinar com o momento."
+            />
+          )}
+
+          {erroApi !== "" && (
+            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+              {erroApi}
+            </Text>
+          )}
+
+          <View style={styles.espacoGrande} />
+
+          <Button title="Começar novamente" onPress={reiniciar} />
         </View>
       ) : (
         <View>
@@ -1235,6 +1875,25 @@ export default function Index() {
               >
                 {atividadeEscolhida.nome}
               </Text>
+
+              {modalidadeEscolhida && (
+                <>
+                  <Text
+                    style={[
+                      styles.cardTitulo,
+                      modoEscuro && styles.textoEscuro,
+                    ]}
+                  >
+                    Forma escolhida
+                  </Text>
+
+                  <Text
+                    style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
+                  >
+                    {modalidadeEscolhida.nome}
+                  </Text>
+                </>
+              )}
             </View>
           )}
 
@@ -1318,65 +1977,57 @@ export default function Index() {
               <ActivityIndicator />
 
               <Text style={modoEscuro && styles.textoEscuro}>
-                Procurando restaurantes próximos...
+                Procurando opções próximas...
               </Text>
             </View>
           )}
 
           {locais.length > 0 && (
-            <View style={styles.lista}>
-              <Text
-                style={[styles.cardTitulo, modoEscuro && styles.textoEscuro]}
-              >
-                Restaurantes próximos
-              </Text>
+            <ResultadoLocais
+              titulo={
+                atividadeEscolhida?.id === "cafe"
+                  ? "Cafeterias próximas"
+                  : atividadeEscolhida?.id === "parque"
+                    ? "Parques próximos"
+                    : atividadeEscolhida?.id === "cinema"
+                      ? "Cinemas próximos"
+                      : atividadeEscolhida?.id === "passeio"
+                        ? "Lugares próximos"
+                        : atividadeEscolhida?.id === "restaurante"
+                          ? "Restaurantes próximos"
+                          : "Opções próximas"
+              }
+              locais={locais}
+              latitude={latitude ?? 0}
+              longitude={longitude ?? 0}
+              mostrarMapa
+            />
+          )}
 
-              <FlatList
-                data={locais}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View
-                    style={[styles.local, modoEscuro && styles.localEscuro]}
-                  >
-                    <Text
-                      style={[
-                        styles.localNome,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
-                      {item.nome}
-                    </Text>
+          {atividadeEscolhida?.id === "cinema" && (
+            <View style={styles.blocoResultado}>
+              {carregandoFilmes ? (
+                <View style={styles.carregando}>
+                  <ActivityIndicator />
 
-                    <Text
-                      style={[
-                        styles.textoCard,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
-                      {item.endereco}
-                    </Text>
-                  </View>
-                )}
-              />
+                  <Text style={modoEscuro && styles.textoEscuro}>
+                    Procurando filmes...
+                  </Text>
+                </View>
+              ) : (
+                <ResultadoFilmes
+                  filmes={filmes}
+                  titulo="Filmes para assistir no cinema"
+                  subtitulo="Depois de encontrar os cinemas, veja também algumas sugestões de filmes."
+                  mostrarCategorias
+                />
+              )}
             </View>
           )}
 
-          {Platform.OS === "web" && latitude !== null && longitude !== null && (
-            <View style={styles.mapa}>
-              <Mapa latitude={latitude} longitude={longitude} locais={locais} />
-            </View>
-          )}
+          <View style={styles.espacoGrande} />
 
-          {Platform.OS !== "web" && (
-            <Text style={[styles.aviso, modoEscuro && styles.textoEscuro]}>
-              O mapa interativo está disponível atualmente na versão Web. Os
-              locais encontrados continuam disponíveis acima.
-            </Text>
-          )}
-
-          <View style={styles.espacoGrande}>
-            <Button title="Começar novamente" onPress={reiniciar} />
-          </View>
+          <Button title="Começar novamente" onPress={reiniciar} />
         </View>
       )}
     </View>
@@ -1576,29 +2227,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  local: {
-    borderWidth: 1,
-    borderColor: "#999999",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-  },
-
-  localEscuro: {
-    borderColor: "#666666",
-  },
-
-  localNome: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-
-  mapa: {
-    width: "100%",
-    marginTop: 15,
-  },
-
   resultadoCard: {
     borderWidth: 2,
     borderColor: "#333333",
@@ -1622,5 +2250,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     textAlign: "center",
+  },
+
+  blocoResultado: {
+    marginTop: 10,
   },
 });
