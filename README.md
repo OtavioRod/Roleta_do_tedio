@@ -1,6 +1,6 @@
 # Roleta do tedio
 
-projeto hospedado no vercel: https://roleta-do-tedio-ec3kmucs8-otaviorod.vercel.app/
+projeto hospedado no vercel: https://roleta-do-tedio.vercel.app/
 
 Problema Identificado: A "fadiga de decisão" enfrentada por casais e grupos de amigos que perdem tempo e se estressam tentando decidir o que fazer no lazer (como o que comer ou assistir no sábado à noite).
 
