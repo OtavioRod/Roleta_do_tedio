@@ -19,9 +19,7 @@ import ResultadoLocais from "../components/ResultadoLocais";
 import ResultadoReceitas from "../components/ResultadoReceitas";
 
 import { Atividade, atividades, Gasto, Modalidade } from "../data/atividades";
-
 import { Jogo, jogos } from "../data/jogos";
-
 import { buscarLocais, Local } from "../services/overpass";
 
 import {
@@ -29,11 +27,10 @@ import {
   Clima,
 } from "../services/openMeteo";
 
-import { buscarReceitas, Receita } from "../services/receitas";
-
-import { buscarFilmes, Filme } from "../services/filmes";
-
+import { salvarSessao } from "../services/backend";
 import { buscarEventos, Evento } from "../services/eventos";
+import { buscarFilmes, Filme } from "../services/filmes";
+import { buscarReceitas, Receita } from "../services/receitas";
 
 type Participante = {
   nome: string;
@@ -236,7 +233,6 @@ export default function Index() {
   function proximoParticipante() {
     if (participanteAtual < participantes.length - 1) {
       setParticipanteAtual(participanteAtual + 1);
-
       setEtapa("humor");
       return;
     }
@@ -290,7 +286,6 @@ export default function Index() {
     };
 
     setParticipantes([...participantes, participante]);
-
     setNomeParticipante("");
   }
 
@@ -463,7 +458,7 @@ export default function Index() {
     return pontos;
   }
 
-  function escolherAtividade() {
+  async function escolherAtividade() {
     if (carregandoRoleta) {
       return;
     }
@@ -472,40 +467,39 @@ export default function Index() {
     setErroApi("");
     setModalidadeEscolhida(null);
 
+    let escolhida: Atividade;
+
     const atividadesValidas = atividades.filter((atividade) =>
       atividadePodeSerEscolhida(atividade),
     );
 
     if (atividadesValidas.length === 0) {
-      const atividadeAlternativa =
-        atividades[Math.floor(Math.random() * atividades.length)];
+      escolhida = atividades[Math.floor(Math.random() * atividades.length)];
+    } else {
+      let maiorPontuacao = -1;
+      let melhores: Atividade[] = [];
 
-      setAtividadeEscolhida(atividadeAlternativa);
+      atividadesValidas.forEach((atividade) => {
+        const pontuacao = calcularPontuacao(atividade);
 
-      setCarregandoRoleta(false);
-      setEtapa("resultado");
-      return;
+        if (pontuacao > maiorPontuacao) {
+          maiorPontuacao = pontuacao;
+          melhores = [atividade];
+        } else if (pontuacao === maiorPontuacao) {
+          melhores.push(atividade);
+        }
+      });
+
+      escolhida = melhores[Math.floor(Math.random() * melhores.length)];
     }
 
-    let maiorPontuacao = -1;
-
-    let melhores: Atividade[] = [];
-
-    atividadesValidas.forEach((atividade) => {
-      const pontuacao = calcularPontuacao(atividade);
-
-      if (pontuacao > maiorPontuacao) {
-        maiorPontuacao = pontuacao;
-
-        melhores = [atividade];
-      } else if (pontuacao === maiorPontuacao) {
-        melhores.push(atividade);
-      }
-    });
-
-    const escolhida = melhores[Math.floor(Math.random() * melhores.length)];
-
     setAtividadeEscolhida(escolhida);
+
+    try {
+      await salvarSessao(escolhida.nome, tipo);
+    } catch (erro) {
+      console.error("Não foi possível salvar a sessão:", erro);
+    }
 
     setCarregandoRoleta(false);
     setEtapa("resultado");
@@ -517,11 +511,9 @@ export default function Index() {
     }
 
     const modalidades = atividadeEscolhida.modalidades;
-
     const tempo = menorTempoDisponivel();
 
     let melhorModalidade: Modalidade | null = null;
-
     let maiorPontuacao = -1;
 
     modalidades.forEach((modalidade) => {
@@ -582,7 +574,6 @@ export default function Index() {
 
       if (pontos > maiorPontuacao) {
         maiorPontuacao = pontos;
-
         melhorModalidade = modalidade;
       }
     });
@@ -599,7 +590,6 @@ export default function Index() {
       const modalidades = atividadeEscolhida?.modalidades ?? [];
 
       let melhor: Modalidade | null = null;
-
       let maiorPontuacao = -1;
 
       const tempo = menorTempoDisponivel();
@@ -686,7 +676,6 @@ export default function Index() {
 
         if (pontos > maiorPontuacao) {
           maiorPontuacao = pontos;
-
           melhor = modalidade;
         }
       });
@@ -785,7 +774,6 @@ export default function Index() {
 
     try {
       setCarregandoLocais(true);
-
       setErroApi("");
 
       const resultados = await buscarLocais(lat, lon, tipoLocal);
@@ -807,7 +795,6 @@ export default function Index() {
   async function buscarFilmesResultado() {
     try {
       setCarregandoFilmes(true);
-
       setErroApi("");
 
       const resultados = await buscarFilmes(8);
@@ -827,7 +814,6 @@ export default function Index() {
   async function buscarReceitasResultado() {
     try {
       setCarregandoReceitas(true);
-
       setErroApi("");
 
       const resultados = await buscarReceitas(6);
@@ -951,7 +937,6 @@ export default function Index() {
   async function buscarEventosResultado(lat: number, lon: number) {
     try {
       setCarregandoEventos(true);
-
       setErroApi("");
 
       const cidade = await obterCidadeAtual(lat, lon);
@@ -979,37 +964,27 @@ export default function Index() {
 
     if (atividadeEscolhida.id === "jogar") {
       prepararJogos();
-
       setEtapa("resultadoJogos");
-
       return;
     }
 
     if (atividadeEscolhida.id === "filme-casa") {
       setFilmes([]);
-
       setEtapa("resultadoFilmes");
-
       await buscarFilmesResultado();
-
       return;
     }
 
     if (atividadeEscolhida.id === "evento") {
       setEventos([]);
-
       setEtapa("localizacao");
-
       await buscarLocalizacao();
-
       return;
     }
 
     if (precisaDeLocalizacao()) {
       setEtapa("localizacao");
-
       await buscarLocalizacao();
-
       return;
     }
 
@@ -1019,7 +994,6 @@ export default function Index() {
   async function buscarLocalizacao() {
     try {
       setCarregandoLocalizacao(true);
-
       setErroApi("");
 
       const permissao = await Location.requestForegroundPermissionsAsync();
@@ -1036,14 +1010,11 @@ export default function Index() {
       });
 
       const lat = localizacao.coords.latitude;
-
       const lon = localizacao.coords.longitude;
-
       const precisaoObtida = localizacao.coords.accuracy;
 
       setLatitude(lat);
       setLongitude(lon);
-
       setPrecisao(precisaoObtida ?? null);
 
       if (atividadeEscolhida?.id === "cafe") {
@@ -1068,7 +1039,6 @@ export default function Index() {
 
         if (modalidade?.id === "cafe-fora") {
           await buscarLocaisProximos(lat, lon);
-
           return;
         }
       }
@@ -1089,7 +1059,6 @@ export default function Index() {
         setFilmes([]);
 
         await buscarLocaisProximos(lat, lon);
-
         await buscarFilmesResultado();
 
         return;
@@ -1799,7 +1768,7 @@ export default function Index() {
         <View>
           {carregandoJogos ? (
             <View style={styles.carregando}>
-              <ActivityIndicator size="large" />
+              <ActivityIndicator />
 
               <Text style={modoEscuro && styles.textoEscuro}>
                 Separando os jogos...
@@ -1948,8 +1917,7 @@ export default function Index() {
               <Text
                 style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
               >
-                Temperatura: {clima.temperatura}
-                °C
+                Temperatura: {clima.temperatura} °C
               </Text>
 
               <Text

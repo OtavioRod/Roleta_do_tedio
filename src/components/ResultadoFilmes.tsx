@@ -1,9 +1,10 @@
+import { useMemo, useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 type Filme = {
@@ -36,6 +37,14 @@ const categorias = [
   "Animação",
 ];
 
+const filmesOscar = [
+  "O Poderoso Chefão",
+  "Um Sonho de Liberdade",
+  "Parasita",
+  "Cidade de Deus",
+  "O Senhor dos Anéis: O Retorno do Rei",
+];
+
 export default function ResultadoFilmes({
   filmes,
   titulo = "Escolha um filme",
@@ -43,6 +52,23 @@ export default function ResultadoFilmes({
   mostrarCategorias = true,
   onSelecionarFilme,
 }: Props) {
+  const [categoriaSelecionada, setCategoriaSelecionada] =
+    useState("Melhores avaliados");
+
+  const filmesFiltrados = useMemo(() => {
+    if (categoriaSelecionada === "Melhores avaliados") {
+      return [...filmes].sort((a, b) => b.nota - a.nota);
+    }
+
+    if (categoriaSelecionada === "Oscar") {
+      return filmes.filter((filme) => filmesOscar.includes(filme.titulo));
+    }
+
+    return filmes.filter((filme) =>
+      filme.genero.toLowerCase().includes(categoriaSelecionada.toLowerCase()),
+    );
+  }, [filmes, categoriaSelecionada]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.titulo}>{titulo}</Text>
@@ -56,39 +82,61 @@ export default function ResultadoFilmes({
           style={styles.categoriasContainer}
           contentContainerStyle={styles.categoriasConteudo}
         >
-          {categorias.map((categoria) => (
-            <TouchableOpacity key={categoria} style={styles.categoria}>
-              <Text style={styles.textoCategoria}>{categoria}</Text>
-            </TouchableOpacity>
-          ))}
+          {categorias.map((categoria) => {
+            const selecionada = categoriaSelecionada === categoria;
+
+            return (
+              <TouchableOpacity
+                key={categoria}
+                style={[
+                  styles.categoria,
+                  selecionada && styles.categoriaSelecionada,
+                ]}
+                onPress={() => setCategoriaSelecionada(categoria)}
+              >
+                <Text
+                  style={[
+                    styles.textoCategoria,
+                    selecionada && styles.textoCategoriaSelecionada,
+                  ]}
+                >
+                  {categoria}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
       )}
 
-      {filmes.length === 0 ? (
+      <Text style={styles.filtroAtual}>{categoriaSelecionada}</Text>
+
+      {filmesFiltrados.length === 0 ? (
         <View style={styles.semFilmes}>
-          <Text style={styles.semFilmesTitulo}>
-            Ainda não temos filmes para mostrar.
-          </Text>
+          <Text style={styles.semFilmesTitulo}>Nenhum filme encontrado.</Text>
 
           <Text style={styles.semFilmesTexto}>
-            Quando a fonte de filmes estiver conectada, as recomendações
-            aparecerão aqui.
+            Não encontramos filmes nessa categoria com os dados disponíveis no
+            momento.
           </Text>
         </View>
       ) : (
         <View style={styles.lista}>
-          {filmes.map((filme) => (
+          {filmesFiltrados.map((filme) => (
             <View key={filme.id} style={styles.card}>
               <View style={styles.cabecalhoCard}>
                 <Text style={styles.tituloFilme}>{filme.titulo}</Text>
 
                 <View style={styles.nota}>
-                  <Text style={styles.notaTexto}>{filme.nota.toFixed(1)}</Text>
+                  <Text style={styles.notaTexto}>
+                    {filme.nota > 0 ? filme.nota.toFixed(1) : "N/A"}
+                  </Text>
                 </View>
               </View>
 
               <Text style={styles.informacoes}>
-                {filme.ano} • {filme.genero}
+                {filme.ano > 0
+                  ? `${filme.ano} • ${filme.genero}`
+                  : filme.genero}
               </Text>
 
               {filme.categoria && (
@@ -132,7 +180,7 @@ const styles = StyleSheet.create({
   },
 
   categoriasContainer: {
-    marginBottom: 15,
+    marginBottom: 12,
   },
 
   categoriasConteudo: {
@@ -148,8 +196,24 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
+  categoriaSelecionada: {
+    backgroundColor: "#222222",
+    borderColor: "#222222",
+  },
+
   textoCategoria: {
     fontSize: 14,
+  },
+
+  textoCategoriaSelecionada: {
+    color: "#ffffff",
+    fontWeight: "bold",
+  },
+
+  filtroAtual: {
+    fontSize: 14,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
 
   lista: {

@@ -1,63 +1,139 @@
-Histórico do Projeto — Roleta do Tédio
-Estrutura inicial do Projeto
+# Histórico do Projeto — Roleta do Tédio
 
-Foi implementada uma primeira estrutura funcional do Projeto, separando a aplicação em componentes, dados e serviços.
+## 1. Sobre o projeto
 
-O que foi implementado
+A Roleta do Tédio é um aplicativo desenvolvido em React Native com Expo para ajudar o usuário a decidir o que fazer de acordo com suas respostas, como modalidade, humor, tempo, dinheiro e disposição.
 
-- Integração do fluxo principal de atividades em `src/app/index.tsx`.
-- Criação de componentes específicos para apresentação dos resultados.
-- Criação da estrutura de jogos disponíveis no aplicativo.
-- Criação dos serviços responsáveis pelas integrações externas.
-- Integração com localização do dispositivo.
-- Integração com informações de clima.
-- Busca de locais próximos utilizando dados do OpenStreetMap.
-- Busca de receitas.
-- Busca de filmes.
-- Busca de eventos.
-- Exibição de resultados de jogos.
-- Exibição de resultados de filmes.
-- Exibição de resultados de receitas.
-- Exibição de resultados de eventos.
-- Exibição de locais próximos.
-- Integração do mapa na versão Web.
-- Correção do carregamento do Leaflet para evitar problemas relacionados ao ambiente Web.
+O aplicativo pode indicar atividades como comer fora, ir ao cinema, tomar café, passear, ir a eventos, jogar ou assistir a um filme em casa.
 
-Nova organização
+## 2. Estrutura do projeto
 
-text
-src/
-├── app/
-│ └── index.tsx
-├── components/
-│ ├── ParticipanteItem.tsx
-│ ├── MapaLeaflet.tsx
-│ ├── ResultadoEventos.tsx
-│ ├── ResultadoFilmes.tsx
-│ ├── ResultadoJogos.tsx
-│ ├── ResultadoLocais.tsx
-│ └── ResultadoReceitas.tsx
-├── data/
-│ ├── atividades.ts
-│ └── jogos.ts
-└── services/
-├── eventos.ts
-├── filmes.ts
-├── openMeteo.ts
-├── overpass.ts
-└── receitas.ts
+```text
+Roleta_do_tedio/
+│
+├── backend/
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── server.js
+│   ├── db.js
+│   └── .env
+│
+├── src/
+│   ├── app/
+│   │   ├── index.tsx
+│   │   ├── explore.tsx
+│   │   └── _layout.tsx
+│   │
+│   ├── components/
+│   │   ├── ParticipanteItem.tsx
+│   │   ├── MapaLeaflet.tsx
+│   │   ├── MapaLeaflet.web.tsx
+│   │   ├── ResultadoLocais.tsx
+│   │   ├── ResultadoFilmes.tsx
+│   │   ├── ResultadoEventos.tsx
+│   │   ├── ResultadoReceitas.tsx
+│   │   └── ResultadoJogos.tsx
+│   │
+│   ├── data/
+│   │   ├── atividades.ts
+│   │   └── jogos.ts
+│   │
+│   └── services/
+│       ├── overpass.ts
+│       ├── openMeteo.ts
+│       ├── receitas.ts
+│       ├── filmes.ts
+│       ├── eventos.ts
+│       └── backend.ts
+│
+├── HISTORICO.md
+├── package.json
+└── .gitignore
 
-Situação atual
-O aplicativo já possui a estrutura necessária para selecionar uma atividade e apresentar resultados diferentes de acordo com o tipo de atividade escolhido.
-As integrações externas e algumas regras de decisão ainda precisam ser testadas e refinadas.
+src/app/
 
-Próximos passos
+Contém as telas e o fluxo principal do aplicativo.
 
-- Testar o fluxo completo da aplicação.
-- Testar cada tipo de atividade individualmente.
-- Revisar os resultados retornados pelas APIs.
-- Melhorar as regras de seleção das atividades.
-- Implementar e testar a salvaguarda.
-- Melhorar a experiência visual.
-- Tratar situações em que uma API não retorna resultados.
-- Revisar a integração final entre as funcionalidades.
+index.tsx — controla o fluxo da roleta, perguntas, escolhas e resultado final.
+_layout.tsx — configura a navegação do Expo.
+explore.tsx — tela padrão do projeto Expo, mantida na estrutura.
+src/components/
+
+Contém componentes reutilizáveis responsáveis pela apresentação dos resultados.
+
+ParticipanteItem.tsx — apresenta participantes.
+MapaLeaflet.tsx — mapa utilizado no aplicativo.
+MapaLeaflet.web.tsx — versão do mapa específica para Web.
+ResultadoLocais.tsx — mostra locais encontrados.
+ResultadoFilmes.tsx — mostra filmes.
+ResultadoEventos.tsx — mostra eventos.
+ResultadoReceitas.tsx — mostra receitas.
+ResultadoJogos.tsx — mostra jogos.
+src/data/
+
+Contém dados que pertencem ao próprio aplicativo.
+
+atividades.ts — lista de atividades e informações usadas pela roleta.
+jogos.ts — lista de jogos disponíveis.
+src/services/
+
+Contém as integrações com APIs e com o backend.
+
+overpass.ts — busca locais próximos usando OpenStreetMap/Overpass.
+openMeteo.ts — busca informações de clima.
+receitas.ts — busca receitas.
+filmes.ts — busca informações de filmes.
+eventos.ts — busca eventos.
+backend.ts — comunica o aplicativo com o backend e salva/busca sessões.
+backend/
+
+Contém o servidor responsável pela comunicação com o banco de dados.
+
+server.js — cria a API, recebe requisições e disponibiliza as rotas.
+db.js — configura a conexão com PostgreSQL.
+package.json — dependências e comando para iniciar o backend.
+.env — contém a conexão com o banco. Não deve ser enviado ao GitHub.
+
+Como executar o projeto
+Frontend
+
+Na pasta principal:
+
+npm install
+
+Depois:
+
+npx expo start
+
+Para abrir no navegador, usar a opção Web do Expo.
+
+Backend
+
+Abrir outro terminal e entrar na pasta:
+
+cd backend
+
+Instalar as dependências:
+
+npm install
+
+Iniciar:
+
+npm start
+
+O backend será iniciado na porta definida pela variável PORT ou, localmente, na porta 3000.
+
+Para verificar:
+
+http://localhost:3000
+
+Para testar o banco:
+
+http://localhost:3000/teste-banco
+
+Para consultar as sessões:
+
+http://localhost:3000/sessoes
+
+
+```
