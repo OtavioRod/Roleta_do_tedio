@@ -5,6 +5,7 @@ import {
   Button,
   FlatList,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -717,7 +718,9 @@ export default function Index() {
             Perfeito. Aparentemente pensar virou trabalho demais.
           </Text>
 
-          <Button title="Começar" onPress={comecar} />
+          <Pressable style={styles.botao} onPress={comecar}>
+            <Text style={styles.textoBotao}>Começar</Text>
+          </Pressable>
         </View>
       ) : !salaCriada ? (
         <View>
@@ -728,16 +731,33 @@ export default function Index() {
           <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
             Quem está prestes a reclamar que "não tem nada para fazer"?
           </Text>
-
-          <Button title="Casal" onPress={() => escolherTipo("casal")} />
+          <Pressable
+            style={styles.botao}
+            onPress={() => escolherTipo("sozinho")}
+          >
+            <Text style={styles.textoBotao}>Sozinho</Text>
+          </Pressable>
+          <Pressable style={styles.botao} onPress={() => escolherTipo("casal")}>
+            <Text style={styles.textoBotao}>Casal</Text>
+          </Pressable>
 
           <View style={styles.espaco} />
 
-          <Button title="Amigos" onPress={() => escolherTipo("amigos")} />
+          <Pressable
+            style={styles.botao}
+            onPress={() => escolherTipo("amigos")}
+          >
+            <Text style={styles.textoBotao}>Amigos</Text>
+          </Pressable>
 
           <View style={styles.espaco} />
 
-          <Button title="Sozinho" onPress={() => escolherTipo("sozinho")} />
+          <Pressable
+            style={styles.botao}
+            onPress={() => escolherTipo("sozinho")}
+          >
+            <Text style={styles.textoBotao}>Sozinho</Text>
+          </Pressable>
 
           {tipo !== "" && (
             <View style={styles.blocoDepois}>
@@ -767,8 +787,9 @@ export default function Index() {
                 value={nomeParticipante}
                 onChangeText={setNomeParticipante}
               />
-
-              <Button title="Criar sala" onPress={criarSala} />
+              <Pressable style={styles.botao} onPress={criarSala}>
+                <Text style={styles.textoBotao}>Criar sala</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -802,7 +823,7 @@ export default function Index() {
               <TextInput
                 style={[styles.input, modoEscuro && styles.inputEscuro]}
                 placeholder="Nome de quem vai entrar"
-                placeholderTextColor={modoEscuro ? "#aaaaaa" : "#666666"}
+                placeholderTextColor={modoEscuro ? "#000000" : "#000000"}
                 value={nomeParticipante}
                 onChangeText={setNomeParticipante}
               />
@@ -1394,11 +1415,11 @@ const styles = StyleSheet.create({
   },
 
   containerClaro: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "var(--color-primary)",
   },
 
   containerEscuro: {
-    backgroundColor: "#121212",
+    backgroundColor: "var(--color-dark-mode)",
   },
 
   titulo: {
@@ -1406,6 +1427,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 15,
+
+    color: "var(--color-text)",
   },
 
   descricao: {
@@ -1413,6 +1436,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 25,
+    color: "var(--color-text)",
   },
 
   descricaoMenor: {
@@ -1420,6 +1444,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 22,
+    color: "var(--color-text)",
   },
 
   subtitulo: {
@@ -1490,7 +1515,7 @@ const styles = StyleSheet.create({
 
   inputEscuro: {
     color: "#ffffff",
-    borderColor: "#666666",
+    borderColor: "#080808",
   },
 
   lista: {
@@ -1508,14 +1533,14 @@ const styles = StyleSheet.create({
 
   resposta: {
     borderWidth: 1,
-    borderColor: "#999999",
+    borderColor: "#080707",
     borderRadius: 10,
     padding: 14,
     marginBottom: 10,
   },
 
   respostaEscuro: {
-    borderColor: "#666666",
+    borderColor: "#0a0909",
   },
 
   nomeResposta: {
@@ -1554,14 +1579,14 @@ const styles = StyleSheet.create({
 
   card: {
     borderWidth: 1,
-    borderColor: "#999999",
+    borderColor: "#070606",
     borderRadius: 10,
     padding: 15,
     marginTop: 15,
   },
 
   cardEscuro: {
-    borderColor: "#666666",
+    borderColor: "#000000",
   },
 
   cardTitulo: {
@@ -1578,14 +1603,14 @@ const styles = StyleSheet.create({
 
   local: {
     borderWidth: 1,
-    borderColor: "#999999",
+    borderColor: "#000000",
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
   },
 
   localEscuro: {
-    borderColor: "#666666",
+    borderColor: "#000000",
   },
 
   localNome: {
@@ -1622,5 +1647,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     textAlign: "center",
+  },
+
+  botao: {
+    backgroundColor: "var(--color-button)",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 12, // Bordas arredondadas modernas
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 16,
+  },
+  textoBotao: {
+    color: "var(--color-text)",
+    fontSize: 16,
+    fontWeight: "bold",
   },
 });
