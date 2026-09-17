@@ -20,8 +20,10 @@ import ResultadoLocais from "../components/ResultadoLocais";
 import ResultadoReceitas from "../components/ResultadoReceitas";
 
 import { Atividade, atividades, Gasto, Modalidade } from "../data/atividades";
+
 import { Jogo, jogos } from "../data/jogos";
-import { buscarLocais, Local } from "../services/overpass";
+
+import { buscarLocais, Local, TipoLocal } from "../services/overpass";
 
 import {
   buscarClima as buscarClimaService,
@@ -234,7 +236,9 @@ export default function Index() {
   function proximoParticipante() {
     if (participanteAtual < participantes.length - 1) {
       setParticipanteAtual(participanteAtual + 1);
+
       setEtapa("humor");
+
       return;
     }
 
@@ -287,6 +291,7 @@ export default function Index() {
     };
 
     setParticipantes([...participantes, participante]);
+
     setNomeParticipante("");
   }
 
@@ -485,6 +490,7 @@ export default function Index() {
 
         if (pontuacao > maiorPontuacao) {
           maiorPontuacao = pontuacao;
+
           melhores = [atividade];
         } else if (pontuacao === maiorPontuacao) {
           melhores.push(atividade);
@@ -512,9 +518,11 @@ export default function Index() {
     }
 
     const modalidades = atividadeEscolhida.modalidades;
+
     const tempo = menorTempoDisponivel();
 
     let melhorModalidade: Modalidade | null = null;
+
     let maiorPontuacao = -1;
 
     modalidades.forEach((modalidade) => {
@@ -575,6 +583,7 @@ export default function Index() {
 
       if (pontos > maiorPontuacao) {
         maiorPontuacao = pontos;
+
         melhorModalidade = modalidade;
       }
     });
@@ -591,6 +600,7 @@ export default function Index() {
       const modalidades = atividadeEscolhida?.modalidades ?? [];
 
       let melhor: Modalidade | null = null;
+
       let maiorPontuacao = -1;
 
       const tempo = menorTempoDisponivel();
@@ -677,6 +687,7 @@ export default function Index() {
 
         if (pontos > maiorPontuacao) {
           maiorPontuacao = pontos;
+
           melhor = modalidade;
         }
       });
@@ -701,13 +712,13 @@ export default function Index() {
     }
   }
 
-  function obterTipoLocal() {
+  function obterTipoLocal(): TipoLocal | null {
     if (!atividadeEscolhida) {
       return null;
     }
 
     if (atividadeEscolhida.id === "restaurante") {
-      return "restaurante" as const;
+      return "restaurante";
     }
 
     if (atividadeEscolhida.id === "cafe") {
@@ -715,19 +726,19 @@ export default function Index() {
         return null;
       }
 
-      return "cafe" as const;
+      return "cafe";
     }
 
     if (atividadeEscolhida.id === "cinema") {
-      return "cinema" as const;
+      return "cinema";
     }
 
     if (atividadeEscolhida.id === "parque") {
-      return "parque" as const;
+      return "parque";
     }
 
     if (atividadeEscolhida.id === "passeio") {
-      return "passeio" as const;
+      return "passeio";
     }
 
     return null;
@@ -765,10 +776,28 @@ export default function Index() {
     return false;
   }
 
-  async function buscarLocaisProximos(lat: number, lon: number) {
-    const tipoLocal = obterTipoLocal();
+  /*
+   * CORREÇÃO PRINCIPAL:
+   *
+   * Agora podemos informar diretamente o tipo de local
+   * quando ele já é conhecido.
+   *
+   * Isso resolve o problema do cafe-fora, pois não
+   * dependemos de esperar o setModalidadeEscolhida()
+   * atualizar o estado antes de consultar o Overpass.
+   */
+  async function buscarLocaisProximos(
+    lat: number,
+    lon: number,
+    tipoLocalForcado?: TipoLocal,
+  ) {
+    const tipoLocal = tipoLocalForcado ?? obterTipoLocal();
+
+    console.log("Tipo de local que será buscado:", tipoLocal);
 
     if (!tipoLocal) {
+      console.log("Nenhum tipo de local foi definido.");
+
       setLocais([]);
       return;
     }
@@ -781,12 +810,16 @@ export default function Index() {
 
       setLocais(resultados);
 
+      console.log("Locais encontrados:", resultados.length);
+
       if (resultados.length === 0) {
         setErroApi(
           "Nenhuma opção foi encontrada próxima da localização informada.",
         );
       }
     } catch (erro) {
+      console.error("Erro ao buscar locais próximos:", erro);
+
       setErroApi("Não foi possível buscar opções próximas.");
     } finally {
       setCarregandoLocais(false);
@@ -972,20 +1005,26 @@ export default function Index() {
     if (atividadeEscolhida.id === "filme-casa") {
       setFilmes([]);
       setEtapa("resultadoFilmes");
+
       await buscarFilmesResultado();
+
       return;
     }
 
     if (atividadeEscolhida.id === "evento") {
       setEventos([]);
       setEtapa("localizacao");
+
       await buscarLocalizacao();
+
       return;
     }
 
     if (precisaDeLocalizacao()) {
       setEtapa("localizacao");
+
       await buscarLocalizacao();
+
       return;
     }
 
@@ -1003,6 +1042,7 @@ export default function Index() {
         setErroApi(
           "Permissão de localização não concedida. Autorize a localização para encontrar opções próximas.",
         );
+
         return;
       }
 
@@ -1011,12 +1051,16 @@ export default function Index() {
       });
 
       const lat = localizacao.coords.latitude;
+
       const lon = localizacao.coords.longitude;
+
       const precisaoObtida = localizacao.coords.accuracy;
 
       setLatitude(lat);
       setLongitude(lon);
       setPrecisao(precisaoObtida ?? null);
+
+      console.log("Localização obtida:", lat, lon);
 
       if (atividadeEscolhida?.id === "cafe") {
         const climaAtual = await buscarClima(lat, lon);
@@ -1024,6 +1068,8 @@ export default function Index() {
         const modalidade = climaAtual
           ? await calcularModalidadeCafeComClima(lat, lon)
           : calcularModalidadeCafe();
+
+        console.log("Modalidade de café escolhida:", modalidade?.id);
 
         setModalidadeEscolhida(modalidade);
 
@@ -1039,7 +1085,14 @@ export default function Index() {
         }
 
         if (modalidade?.id === "cafe-fora") {
-          await buscarLocaisProximos(lat, lon);
+          /*
+           * CORREÇÃO:
+           *
+           * Não esperamos o estado modalidadeEscolhida
+           * ser atualizado. Já sabemos que o tipo é cafe.
+           */
+          await buscarLocaisProximos(lat, lon, "cafe");
+
           return;
         }
       }
@@ -1060,6 +1113,7 @@ export default function Index() {
         setFilmes([]);
 
         await buscarLocaisProximos(lat, lon);
+
         await buscarFilmesResultado();
 
         return;
@@ -1067,6 +1121,8 @@ export default function Index() {
 
       await buscarLocaisProximos(lat, lon);
     } catch (erro) {
+      console.error("Erro ao obter localização:", erro);
+
       setErroApi(
         "Não foi possível obter sua localização. Verifique se o GPS está disponível e tente novamente.",
       );
@@ -1138,12 +1194,6 @@ export default function Index() {
 
   const participante = participantes[participanteAtual];
 
-  /*
-   * SOMENTE estas etapas possuem rolagem vertical.
-   *
-   * As telas anteriores continuam funcionando normalmente,
-   * sem transformar todo o aplicativo em uma ScrollView.
-   */
   const telaDeResultado =
     etapa === "resultado" ||
     etapa === "resultadoModalidade" ||
@@ -1616,9 +1666,9 @@ export default function Index() {
         <ScrollView
           style={styles.resultadoScroll}
           contentContainerStyle={styles.resultadoScrollFundo}
-          showsVerticalScrollIndicator={true}
+          showsVerticalScrollIndicator
           keyboardShouldPersistTaps="handled"
-          nestedScrollEnabled={true}
+          nestedScrollEnabled
         >
           <View style={styles.resultadoScrollConteudo}>
             {etapa === "resultado" ? (
@@ -2088,12 +2138,6 @@ export default function Index() {
 }
 
 const styles = StyleSheet.create({
-  /*
-   * Container geral do aplicativo.
-   *
-   * Não usamos ScrollView aqui porque você pediu que a rolagem
-   * aconteça somente nas telas de resultado.
-   */
   container: {
     flex: 1,
     justifyContent: "center",
@@ -2101,10 +2145,6 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
 
-  /*
-   * Nas telas de resultado o conteúdo precisa começar no topo.
-   * O ScrollView ocupa o espaço disponível.
-   */
   containerResultado: {
     justifyContent: "flex-start",
   },
@@ -2117,9 +2157,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
   },
 
-  /*
-   * Conteúdo das telas anteriores à roleta.
-   */
   conteudoPrincipal: {
     width: "100%",
     maxWidth: 700,
@@ -2127,26 +2164,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  /*
-   * ScrollView vertical dos resultados.
-   *
-   * flex: 1 faz funcionar tanto no celular quanto no navegador,
-   * ocupando todo o espaço disponível da tela.
-   */
   resultadoScroll: {
     flex: 1,
     width: "100%",
   },
 
-  /*
-   * Espaço interno da rolagem.
-   *
-   * paddingHorizontal evita que os cards encostem nas bordas
-   * em telas pequenas.
-   *
-   * paddingBottom garante que o último botão possa ser alcançado
-   * mesmo no final da página.
-   */
   resultadoScrollFundo: {
     width: "100%",
     alignItems: "center",
@@ -2155,13 +2177,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  /*
-   * Área máxima dos resultados.
-   *
-   * No celular ocupa 100% da largura disponível.
-   * No navegador fica limitada para não criar linhas
-   * excessivamente compridas.
-   */
   resultadoScrollConteudo: {
     width: "100%",
     maxWidth: 1000,
