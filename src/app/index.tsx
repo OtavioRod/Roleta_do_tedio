@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Button,
   FlatList,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,18 +23,17 @@ import { Atividade, atividades, Gasto, Modalidade } from "../data/atividades";
 
 import { Jogo, jogos } from "../data/jogos";
 
-import { buscarLocais, Local } from "../services/overpass";
+import { buscarLocais, Local, TipoLocal } from "../services/overpass";
 
 import {
   buscarClima as buscarClimaService,
   Clima,
 } from "../services/openMeteo";
 
-import { buscarReceitas, Receita } from "../services/receitas";
-
-import { buscarFilmes, Filme } from "../services/filmes";
-
+import { salvarSessao } from "../services/backend";
 import { buscarEventos, Evento } from "../services/eventos";
+import { buscarFilmes, Filme } from "../services/filmes";
+import { buscarReceitas, Receita } from "../services/receitas";
 
 type Participante = {
   nome: string;
@@ -238,6 +238,7 @@ export default function Index() {
       setParticipanteAtual(participanteAtual + 1);
 
       setEtapa("humor");
+
       return;
     }
 
@@ -463,7 +464,7 @@ export default function Index() {
     return pontos;
   }
 
-  function escolherAtividade() {
+  async function escolherAtividade() {
     if (carregandoRoleta) {
       return;
     }
@@ -472,40 +473,40 @@ export default function Index() {
     setErroApi("");
     setModalidadeEscolhida(null);
 
+    let escolhida: Atividade;
+
     const atividadesValidas = atividades.filter((atividade) =>
       atividadePodeSerEscolhida(atividade),
     );
 
     if (atividadesValidas.length === 0) {
-      const atividadeAlternativa =
-        atividades[Math.floor(Math.random() * atividades.length)];
+      escolhida = atividades[Math.floor(Math.random() * atividades.length)];
+    } else {
+      let maiorPontuacao = -1;
+      let melhores: Atividade[] = [];
 
-      setAtividadeEscolhida(atividadeAlternativa);
+      atividadesValidas.forEach((atividade) => {
+        const pontuacao = calcularPontuacao(atividade);
 
-      setCarregandoRoleta(false);
-      setEtapa("resultado");
-      return;
+        if (pontuacao > maiorPontuacao) {
+          maiorPontuacao = pontuacao;
+
+          melhores = [atividade];
+        } else if (pontuacao === maiorPontuacao) {
+          melhores.push(atividade);
+        }
+      });
+
+      escolhida = melhores[Math.floor(Math.random() * melhores.length)];
     }
 
-    let maiorPontuacao = -1;
-
-    let melhores: Atividade[] = [];
-
-    atividadesValidas.forEach((atividade) => {
-      const pontuacao = calcularPontuacao(atividade);
-
-      if (pontuacao > maiorPontuacao) {
-        maiorPontuacao = pontuacao;
-
-        melhores = [atividade];
-      } else if (pontuacao === maiorPontuacao) {
-        melhores.push(atividade);
-      }
-    });
-
-    const escolhida = melhores[Math.floor(Math.random() * melhores.length)];
-
     setAtividadeEscolhida(escolhida);
+
+    try {
+      await salvarSessao(escolhida.nome, tipo);
+    } catch (erro) {
+      console.error("Não foi possível salvar a sessão:", erro);
+    }
 
     setCarregandoRoleta(false);
     setEtapa("resultado");
@@ -711,13 +712,13 @@ export default function Index() {
     }
   }
 
-  function obterTipoLocal() {
+  function obterTipoLocal(): TipoLocal | null {
     if (!atividadeEscolhida) {
       return null;
     }
 
     if (atividadeEscolhida.id === "restaurante") {
-      return "restaurante" as const;
+      return "restaurante";
     }
 
     if (atividadeEscolhida.id === "cafe") {
@@ -725,19 +726,19 @@ export default function Index() {
         return null;
       }
 
-      return "cafe" as const;
+      return "cafe";
     }
 
     if (atividadeEscolhida.id === "cinema") {
-      return "cinema" as const;
+      return "cinema";
     }
 
     if (atividadeEscolhida.id === "parque") {
-      return "parque" as const;
+      return "parque";
     }
 
     if (atividadeEscolhida.id === "passeio") {
-      return "passeio" as const;
+      return "passeio";
     }
 
     return null;
@@ -775,22 +776,41 @@ export default function Index() {
     return false;
   }
 
-  async function buscarLocaisProximos(lat: number, lon: number) {
-    const tipoLocal = obterTipoLocal();
+  /*
+   * CORREÇÃO PRINCIPAL:
+   *
+   * Agora podemos informar diretamente o tipo de local
+   * quando ele já é conhecido.
+   *
+   * Isso resolve o problema do cafe-fora, pois não
+   * dependemos de esperar o setModalidadeEscolhida()
+   * atualizar o estado antes de consultar o Overpass.
+   */
+  async function buscarLocaisProximos(
+    lat: number,
+    lon: number,
+    tipoLocalForcado?: TipoLocal,
+  ) {
+    const tipoLocal = tipoLocalForcado ?? obterTipoLocal();
+
+    console.log("Tipo de local que será buscado:", tipoLocal);
 
     if (!tipoLocal) {
+      console.log("Nenhum tipo de local foi definido.");
+
       setLocais([]);
       return;
     }
 
     try {
       setCarregandoLocais(true);
-
       setErroApi("");
 
       const resultados = await buscarLocais(lat, lon, tipoLocal);
 
       setLocais(resultados);
+
+      console.log("Locais encontrados:", resultados.length);
 
       if (resultados.length === 0) {
         setErroApi(
@@ -798,6 +818,8 @@ export default function Index() {
         );
       }
     } catch (erro) {
+      console.error("Erro ao buscar locais próximos:", erro);
+
       setErroApi("Não foi possível buscar opções próximas.");
     } finally {
       setCarregandoLocais(false);
@@ -807,7 +829,6 @@ export default function Index() {
   async function buscarFilmesResultado() {
     try {
       setCarregandoFilmes(true);
-
       setErroApi("");
 
       const resultados = await buscarFilmes(8);
@@ -827,7 +848,6 @@ export default function Index() {
   async function buscarReceitasResultado() {
     try {
       setCarregandoReceitas(true);
-
       setErroApi("");
 
       const resultados = await buscarReceitas(6);
@@ -951,7 +971,6 @@ export default function Index() {
   async function buscarEventosResultado(lat: number, lon: number) {
     try {
       setCarregandoEventos(true);
-
       setErroApi("");
 
       const cidade = await obterCidadeAtual(lat, lon);
@@ -979,15 +998,12 @@ export default function Index() {
 
     if (atividadeEscolhida.id === "jogar") {
       prepararJogos();
-
       setEtapa("resultadoJogos");
-
       return;
     }
 
     if (atividadeEscolhida.id === "filme-casa") {
       setFilmes([]);
-
       setEtapa("resultadoFilmes");
 
       await buscarFilmesResultado();
@@ -997,7 +1013,6 @@ export default function Index() {
 
     if (atividadeEscolhida.id === "evento") {
       setEventos([]);
-
       setEtapa("localizacao");
 
       await buscarLocalizacao();
@@ -1019,7 +1034,6 @@ export default function Index() {
   async function buscarLocalizacao() {
     try {
       setCarregandoLocalizacao(true);
-
       setErroApi("");
 
       const permissao = await Location.requestForegroundPermissionsAsync();
@@ -1028,6 +1042,7 @@ export default function Index() {
         setErroApi(
           "Permissão de localização não concedida. Autorize a localização para encontrar opções próximas.",
         );
+
         return;
       }
 
@@ -1043,8 +1058,9 @@ export default function Index() {
 
       setLatitude(lat);
       setLongitude(lon);
-
       setPrecisao(precisaoObtida ?? null);
+
+      console.log("Localização obtida:", lat, lon);
 
       if (atividadeEscolhida?.id === "cafe") {
         const climaAtual = await buscarClima(lat, lon);
@@ -1052,6 +1068,8 @@ export default function Index() {
         const modalidade = climaAtual
           ? await calcularModalidadeCafeComClima(lat, lon)
           : calcularModalidadeCafe();
+
+        console.log("Modalidade de café escolhida:", modalidade?.id);
 
         setModalidadeEscolhida(modalidade);
 
@@ -1067,7 +1085,13 @@ export default function Index() {
         }
 
         if (modalidade?.id === "cafe-fora") {
-          await buscarLocaisProximos(lat, lon);
+          /*
+           * CORREÇÃO:
+           *
+           * Não esperamos o estado modalidadeEscolhida
+           * ser atualizado. Já sabemos que o tipo é cafe.
+           */
+          await buscarLocaisProximos(lat, lon, "cafe");
 
           return;
         }
@@ -1097,6 +1121,8 @@ export default function Index() {
 
       await buscarLocaisProximos(lat, lon);
     } catch (erro) {
+      console.error("Erro ao obter localização:", erro);
+
       setErroApi(
         "Não foi possível obter sua localização. Verifique se o GPS está disponível e tente novamente.",
       );
@@ -1168,11 +1194,20 @@ export default function Index() {
 
   const participante = participantes[participanteAtual];
 
+  const telaDeResultado =
+    etapa === "resultado" ||
+    etapa === "resultadoModalidade" ||
+    etapa === "resultadoFilmes" ||
+    etapa === "resultadoJogos" ||
+    etapa === "resultadoEventos" ||
+    etapa === "localizacao";
+
   return (
     <View
       style={[
         styles.container,
         modoEscuro ? styles.containerEscuro : styles.containerClaro,
+        telaDeResultado && styles.containerResultado,
       ]}
     >
       <TouchableOpacity style={styles.botaoTema} onPress={alternarTema}>
@@ -1180,7 +1215,7 @@ export default function Index() {
       </TouchableOpacity>
 
       {!iniciou ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Roleta do Tédio
           </Text>
@@ -1196,7 +1231,7 @@ export default function Index() {
           <Button title="Começar" onPress={comecar} />
         </View>
       ) : !salaCriada ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Primeiro, vamos entender a situação
           </Text>
@@ -1249,7 +1284,7 @@ export default function Index() {
           )}
         </View>
       ) : etapa === "tipo" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Sala criada
           </Text>
@@ -1320,7 +1355,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "humor" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Agora é pessoal, {participante?.nome}
           </Text>
@@ -1363,7 +1398,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "humorEscolhido" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Entendido...
           </Text>
@@ -1384,7 +1419,7 @@ export default function Index() {
           <Button title="Descobrir" onPress={() => setEtapa("gasto")} />
         </View>
       ) : etapa === "gasto" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Quanto você pretende gastar?
           </Text>
@@ -1419,7 +1454,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "gastoEscolhido" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Anotado...
           </Text>
@@ -1440,7 +1475,7 @@ export default function Index() {
           <Button title="Continuar" onPress={() => setEtapa("disposicao")} />
         </View>
       ) : etapa === "disposicao" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Qual é a sua disposição?
           </Text>
@@ -1469,7 +1504,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "disposicaoEscolhida" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Última pergunta...
           </Text>
@@ -1492,7 +1527,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "tempo" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Quanto tempo você tem?
           </Text>
@@ -1530,7 +1565,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "tempoEscolhido" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Perfeito...
           </Text>
@@ -1555,7 +1590,7 @@ export default function Index() {
           />
         </View>
       ) : etapa === "resumo" ? (
-        <View>
+        <View style={styles.conteudoPrincipal}>
           <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
             Então é isso...
           </Text>
@@ -1627,409 +1662,477 @@ export default function Index() {
 
           <Button title="Girar a roleta" onPress={escolherAtividade} />
         </View>
-      ) : etapa === "resultado" ? (
-        <View>
-          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
-            A Roleta decidiu.
-          </Text>
-
-          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            Depois de analisar todas as informações, ela chegou a uma conclusão.
-          </Text>
-
-          {carregandoRoleta ? (
-            <ActivityIndicator size="large" />
-          ) : (
-            <>
-              <View
-                style={[
-                  styles.resultadoCard,
-                  modoEscuro && styles.resultadoCardEscuro,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.resultadoTitulo,
-                    modoEscuro && styles.textoEscuro,
-                  ]}
-                >
-                  {atividadeEscolhida?.nome}
+      ) : telaDeResultado ? (
+        <ScrollView
+          style={styles.resultadoScroll}
+          contentContainerStyle={styles.resultadoScrollFundo}
+          showsVerticalScrollIndicator
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+        >
+          <View style={styles.resultadoScrollConteudo}>
+            {etapa === "resultado" ? (
+              <View style={styles.blocoResultado}>
+                <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+                  A Roleta decidiu.
                 </Text>
 
                 <Text
-                  style={[
-                    styles.resultadoDescricao,
-                    modoEscuro && styles.textoEscuro,
-                  ]}
+                  style={[styles.descricao, modoEscuro && styles.textoEscuro]}
                 >
-                  {atividadeEscolhida?.descricao}
+                  Depois de analisar todas as informações, ela chegou a uma
+                  conclusão.
                 </Text>
+
+                {carregandoRoleta ? (
+                  <ActivityIndicator size="large" />
+                ) : (
+                  <>
+                    <View
+                      style={[
+                        styles.resultadoCard,
+                        modoEscuro && styles.resultadoCardEscuro,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.resultadoTitulo,
+                          modoEscuro && styles.textoEscuro,
+                        ]}
+                      >
+                        {atividadeEscolhida?.nome}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.resultadoDescricao,
+                          modoEscuro && styles.textoEscuro,
+                        ]}
+                      >
+                        {atividadeEscolhida?.descricao}
+                      </Text>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.pergunta,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Tempo disponível:
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.subtitulo,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      {menorTempoDisponivel()} minutos
+                    </Text>
+
+                    <Button
+                      title={
+                        atividadeEscolhida?.id === "filme-casa"
+                          ? "Escolher filme"
+                          : atividadeEscolhida?.id === "jogar"
+                            ? "Ver sugestões"
+                            : atividadeEscolhida?.id === "evento"
+                              ? "Encontrar eventos"
+                              : atividadeEscolhida?.id === "cinema"
+                                ? "Encontrar cinemas e filmes"
+                                : atividadeEscolhida?.id === "cafe"
+                                  ? "Descobrir a melhor opção"
+                                  : "Encontrar opções próximas"
+                      }
+                      onPress={continuarParaLocalizacao}
+                    />
+
+                    <View style={styles.espacoGrande} />
+
+                    <Button
+                      title="Girar novamente"
+                      onPress={escolherAtividade}
+                    />
+                  </>
+                )}
               </View>
+            ) : etapa === "resultadoModalidade" ? (
+              <View style={styles.blocoResultado}>
+                <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+                  A Roleta pensou um pouco mais...
+                </Text>
 
-              <Text style={[styles.pergunta, modoEscuro && styles.textoEscuro]}>
-                Tempo disponível:
-              </Text>
+                <Text
+                  style={[styles.descricao, modoEscuro && styles.textoEscuro]}
+                >
+                  A atividade escolhida foi:
+                </Text>
 
-              <Text
-                style={[styles.subtitulo, modoEscuro && styles.textoEscuro]}
-              >
-                {menorTempoDisponivel()} minutos
-              </Text>
-
-              <Button
-                title={
-                  atividadeEscolhida?.id === "filme-casa"
-                    ? "Escolher filme"
-                    : atividadeEscolhida?.id === "jogar"
-                      ? "Ver sugestões"
-                      : atividadeEscolhida?.id === "evento"
-                        ? "Encontrar eventos"
-                        : atividadeEscolhida?.id === "cinema"
-                          ? "Encontrar cinemas e filmes"
-                          : atividadeEscolhida?.id === "cafe"
-                            ? "Descobrir a melhor opção"
-                            : "Encontrar opções próximas"
-                }
-                onPress={continuarParaLocalizacao}
-              />
-
-              <View style={styles.espacoGrande} />
-
-              <Button title="Girar novamente" onPress={escolherAtividade} />
-            </>
-          )}
-        </View>
-      ) : etapa === "resultadoModalidade" ? (
-        <View>
-          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
-            A Roleta pensou um pouco mais...
-          </Text>
-
-          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            A atividade escolhida foi:
-          </Text>
-
-          <View
-            style={[
-              styles.resultadoCard,
-              modoEscuro && styles.resultadoCardEscuro,
-            ]}
-          >
-            <Text
-              style={[styles.resultadoTitulo, modoEscuro && styles.textoEscuro]}
-            >
-              ☕ {atividadeEscolhida?.nome}
-            </Text>
-
-            <Text
-              style={[
-                styles.resultadoDescricao,
-                modoEscuro && styles.textoEscuro,
-              ]}
-            >
-              {modalidadeEscolhida?.nome}
-            </Text>
-
-            <Text style={[styles.textoCard, modoEscuro && styles.textoEscuro]}>
-              {modalidadeEscolhida?.descricao}
-            </Text>
-          </View>
-
-          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            Pelo tempo, disposição, dinheiro e clima de vocês, parece que essa é
-            a opção que faz mais sentido agora.
-          </Text>
-
-          {carregandoReceitas ? (
-            <View style={styles.carregando}>
-              <ActivityIndicator />
-
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Procurando ideias para o café...
-              </Text>
-            </View>
-          ) : (
-            <ResultadoReceitas
-              receitas={receitas}
-              titulo="Ideias para preparar"
-              subtitulo="Algumas receitas para transformar o café em um pequeno evento."
-            />
-          )}
-
-          {erroApi !== "" && (
-            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
-              {erroApi}
-            </Text>
-          )}
-
-          <View style={styles.espacoGrande} />
-
-          <Button title="Começar novamente" onPress={reiniciar} />
-        </View>
-      ) : etapa === "resultadoFilmes" ? (
-        <View>
-          {carregandoFilmes ? (
-            <View style={styles.carregando}>
-              <ActivityIndicator size="large" />
-
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Procurando filmes...
-              </Text>
-            </View>
-          ) : (
-            <ResultadoFilmes
-              filmes={filmes}
-              titulo="Escolha um filme"
-              subtitulo="A decisão já foi tomada. Agora só falta escolher o filme."
-              mostrarCategorias
-            />
-          )}
-
-          {erroApi !== "" && (
-            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
-              {erroApi}
-            </Text>
-          )}
-
-          <View style={styles.espacoGrande} />
-
-          <Button title="Começar novamente" onPress={reiniciar} />
-        </View>
-      ) : etapa === "resultadoJogos" ? (
-        <View>
-          {carregandoJogos ? (
-            <View style={styles.carregando}>
-              <ActivityIndicator size="large" />
-
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Separando os jogos...
-              </Text>
-            </View>
-          ) : (
-            <ResultadoJogos
-              jogos={jogosFiltrados}
-              titulo="Hora de jogar"
-              subtitulo="Filtramos as opções de acordo com o número de pessoas, tempo, dinheiro e disposição."
-            />
-          )}
-
-          {erroApi !== "" && (
-            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
-              {erroApi}
-            </Text>
-          )}
-
-          <View style={styles.espacoGrande} />
-
-          <Button title="Começar novamente" onPress={reiniciar} />
-        </View>
-      ) : etapa === "resultadoEventos" ? (
-        <View>
-          {carregandoEventos ? (
-            <View style={styles.carregando}>
-              <ActivityIndicator size="large" />
-
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Procurando eventos...
-              </Text>
-            </View>
-          ) : (
-            <ResultadoEventos
-              eventos={eventos}
-              titulo="O que está acontecendo por aí?"
-              subtitulo="Encontramos alguns eventos que podem combinar com o momento."
-            />
-          )}
-
-          {erroApi !== "" && (
-            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
-              {erroApi}
-            </Text>
-          )}
-
-          <View style={styles.espacoGrande} />
-
-          <Button title="Começar novamente" onPress={reiniciar} />
-        </View>
-      ) : (
-        <View>
-          <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
-            Encontrando opções...
-          </Text>
-
-          <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-            Agora a roleta vai tentar descobrir se existe alguma coisa
-            interessante perto de vocês.
-          </Text>
-
-          {atividadeEscolhida && (
-            <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
-              <Text
-                style={[styles.cardTitulo, modoEscuro && styles.textoEscuro]}
-              >
-                Atividade escolhida
-              </Text>
-
-              <Text
-                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
-              >
-                {atividadeEscolhida.nome}
-              </Text>
-
-              {modalidadeEscolhida && (
-                <>
+                <View
+                  style={[
+                    styles.resultadoCard,
+                    modoEscuro && styles.resultadoCardEscuro,
+                  ]}
+                >
                   <Text
                     style={[
-                      styles.cardTitulo,
+                      styles.resultadoTitulo,
                       modoEscuro && styles.textoEscuro,
                     ]}
                   >
-                    Forma escolhida
+                    ☕ {atividadeEscolhida?.nome}
+                  </Text>
+
+                  <Text
+                    style={[
+                      styles.resultadoDescricao,
+                      modoEscuro && styles.textoEscuro,
+                    ]}
+                  >
+                    {modalidadeEscolhida?.nome}
                   </Text>
 
                   <Text
                     style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
                   >
-                    {modalidadeEscolhida.nome}
-                  </Text>
-                </>
-              )}
-            </View>
-          )}
-
-          {carregandoLocalizacao && (
-            <View style={styles.carregando}>
-              <ActivityIndicator size="large" />
-
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Descobrindo onde vocês estão...
-              </Text>
-            </View>
-          )}
-
-          {latitude !== null && longitude !== null && (
-            <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
-              <Text
-                style={[styles.cardTitulo, modoEscuro && styles.textoEscuro]}
-              >
-                Localização encontrada
-              </Text>
-
-              <Text
-                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
-              >
-                Latitude: {latitude.toFixed(6)}
-              </Text>
-
-              <Text
-                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
-              >
-                Longitude: {longitude.toFixed(6)}
-              </Text>
-
-              {precisao !== null && (
-                <Text
-                  style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
-                >
-                  Precisão aproximada: {Math.round(precisao)} metros
-                </Text>
-              )}
-            </View>
-          )}
-
-          {clima && (
-            <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
-              <Text
-                style={[styles.cardTitulo, modoEscuro && styles.textoEscuro]}
-              >
-                Clima atual
-              </Text>
-
-              <Text
-                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
-              >
-                Temperatura: {clima.temperatura}
-                °C
-              </Text>
-
-              <Text
-                style={[styles.textoCard, modoEscuro && styles.textoEscuro]}
-              >
-                Precipitação: {clima.chuva} mm
-              </Text>
-
-              {!climaPermiteAtividade() && (
-                <Text style={[styles.aviso, modoEscuro && styles.textoEscuro]}>
-                  O clima não parece muito interessado nessa atividade.
-                </Text>
-              )}
-            </View>
-          )}
-
-          {erroApi !== "" && (
-            <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
-              {erroApi}
-            </Text>
-          )}
-
-          {carregandoLocais && (
-            <View style={styles.carregando}>
-              <ActivityIndicator />
-
-              <Text style={modoEscuro && styles.textoEscuro}>
-                Procurando opções próximas...
-              </Text>
-            </View>
-          )}
-
-          {locais.length > 0 && (
-            <ResultadoLocais
-              titulo={
-                atividadeEscolhida?.id === "cafe"
-                  ? "Cafeterias próximas"
-                  : atividadeEscolhida?.id === "parque"
-                    ? "Parques próximos"
-                    : atividadeEscolhida?.id === "cinema"
-                      ? "Cinemas próximos"
-                      : atividadeEscolhida?.id === "passeio"
-                        ? "Lugares próximos"
-                        : atividadeEscolhida?.id === "restaurante"
-                          ? "Restaurantes próximos"
-                          : "Opções próximas"
-              }
-              locais={locais}
-              latitude={latitude ?? 0}
-              longitude={longitude ?? 0}
-              mostrarMapa
-            />
-          )}
-
-          {atividadeEscolhida?.id === "cinema" && (
-            <View style={styles.blocoResultado}>
-              {carregandoFilmes ? (
-                <View style={styles.carregando}>
-                  <ActivityIndicator />
-
-                  <Text style={modoEscuro && styles.textoEscuro}>
-                    Procurando filmes...
+                    {modalidadeEscolhida?.descricao}
                   </Text>
                 </View>
-              ) : (
-                <ResultadoFilmes
-                  filmes={filmes}
-                  titulo="Filmes para assistir no cinema"
-                  subtitulo="Depois de encontrar os cinemas, veja também algumas sugestões de filmes."
-                  mostrarCategorias
-                />
-              )}
-            </View>
-          )}
 
-          <View style={styles.espacoGrande} />
+                <Text
+                  style={[styles.descricao, modoEscuro && styles.textoEscuro]}
+                >
+                  Pelo tempo, disposição, dinheiro e clima de vocês, parece que
+                  essa é a opção que faz mais sentido agora.
+                </Text>
 
-          <Button title="Começar novamente" onPress={reiniciar} />
-        </View>
-      )}
+                {carregandoReceitas ? (
+                  <View style={styles.carregando}>
+                    <ActivityIndicator />
+
+                    <Text style={modoEscuro && styles.textoEscuro}>
+                      Procurando ideias para o café...
+                    </Text>
+                  </View>
+                ) : (
+                  <ResultadoReceitas
+                    receitas={receitas}
+                    titulo="Ideias para preparar"
+                    subtitulo="Algumas receitas para transformar o café em um pequeno evento."
+                  />
+                )}
+
+                {erroApi !== "" && (
+                  <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+                    {erroApi}
+                  </Text>
+                )}
+
+                <View style={styles.espacoGrande} />
+
+                <Button title="Começar novamente" onPress={reiniciar} />
+              </View>
+            ) : etapa === "resultadoFilmes" ? (
+              <View style={styles.blocoResultado}>
+                {carregandoFilmes ? (
+                  <View style={styles.carregando}>
+                    <ActivityIndicator size="large" />
+
+                    <Text style={modoEscuro && styles.textoEscuro}>
+                      Procurando filmes...
+                    </Text>
+                  </View>
+                ) : (
+                  <ResultadoFilmes
+                    filmes={filmes}
+                    titulo="Escolha um filme"
+                    subtitulo="A decisão já foi tomada. Agora só falta escolher o filme."
+                    mostrarCategorias
+                  />
+                )}
+
+                {erroApi !== "" && (
+                  <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+                    {erroApi}
+                  </Text>
+                )}
+
+                <View style={styles.espacoGrande} />
+
+                <Button title="Começar novamente" onPress={reiniciar} />
+              </View>
+            ) : etapa === "resultadoJogos" ? (
+              <View style={styles.blocoResultado}>
+                {carregandoJogos ? (
+                  <View style={styles.carregando}>
+                    <ActivityIndicator />
+
+                    <Text style={modoEscuro && styles.textoEscuro}>
+                      Separando os jogos...
+                    </Text>
+                  </View>
+                ) : (
+                  <ResultadoJogos
+                    jogos={jogosFiltrados}
+                    titulo="Hora de jogar"
+                    subtitulo="Filtramos as opções de acordo com o número de pessoas, tempo, dinheiro e disposição."
+                  />
+                )}
+
+                {erroApi !== "" && (
+                  <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+                    {erroApi}
+                  </Text>
+                )}
+
+                <View style={styles.espacoGrande} />
+
+                <Button title="Começar novamente" onPress={reiniciar} />
+              </View>
+            ) : etapa === "resultadoEventos" ? (
+              <View style={styles.blocoResultado}>
+                {carregandoEventos ? (
+                  <View style={styles.carregando}>
+                    <ActivityIndicator size="large" />
+
+                    <Text style={modoEscuro && styles.textoEscuro}>
+                      Procurando eventos...
+                    </Text>
+                  </View>
+                ) : (
+                  <ResultadoEventos
+                    eventos={eventos}
+                    titulo="O que está acontecendo por aí?"
+                    subtitulo="Encontramos alguns eventos que podem combinar com o momento."
+                  />
+                )}
+
+                {erroApi !== "" && (
+                  <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+                    {erroApi}
+                  </Text>
+                )}
+
+                <View style={styles.espacoGrande} />
+
+                <Button title="Começar novamente" onPress={reiniciar} />
+              </View>
+            ) : (
+              <View style={styles.blocoResultado}>
+                <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+                  Encontrando opções...
+                </Text>
+
+                <Text
+                  style={[styles.descricao, modoEscuro && styles.textoEscuro]}
+                >
+                  Agora a roleta vai tentar descobrir se existe alguma coisa
+                  interessante perto de vocês.
+                </Text>
+
+                {atividadeEscolhida && (
+                  <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
+                    <Text
+                      style={[
+                        styles.cardTitulo,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Atividade escolhida
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.textoCard,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      {atividadeEscolhida.nome}
+                    </Text>
+
+                    {modalidadeEscolhida && (
+                      <>
+                        <Text
+                          style={[
+                            styles.cardTitulo,
+                            modoEscuro && styles.textoEscuro,
+                          ]}
+                        >
+                          Forma escolhida
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.textoCard,
+                            modoEscuro && styles.textoEscuro,
+                          ]}
+                        >
+                          {modalidadeEscolhida.nome}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                )}
+
+                {carregandoLocalizacao && (
+                  <View style={styles.carregando}>
+                    <ActivityIndicator size="large" />
+
+                    <Text style={modoEscuro && styles.textoEscuro}>
+                      Descobrindo onde vocês estão...
+                    </Text>
+                  </View>
+                )}
+
+                {latitude !== null && longitude !== null && (
+                  <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
+                    <Text
+                      style={[
+                        styles.cardTitulo,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Localização encontrada
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.textoCard,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Latitude: {latitude.toFixed(6)}
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.textoCard,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Longitude: {longitude.toFixed(6)}
+                    </Text>
+
+                    {precisao !== null && (
+                      <Text
+                        style={[
+                          styles.textoCard,
+                          modoEscuro && styles.textoEscuro,
+                        ]}
+                      >
+                        Precisão aproximada: {Math.round(precisao)} metros
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {clima && (
+                  <View style={[styles.card, modoEscuro && styles.cardEscuro]}>
+                    <Text
+                      style={[
+                        styles.cardTitulo,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Clima atual
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.textoCard,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Temperatura: {clima.temperatura} °C
+                    </Text>
+
+                    <Text
+                      style={[
+                        styles.textoCard,
+                        modoEscuro && styles.textoEscuro,
+                      ]}
+                    >
+                      Precipitação: {clima.chuva} mm
+                    </Text>
+
+                    {!climaPermiteAtividade() && (
+                      <Text
+                        style={[styles.aviso, modoEscuro && styles.textoEscuro]}
+                      >
+                        O clima não parece muito interessado nessa atividade.
+                      </Text>
+                    )}
+                  </View>
+                )}
+
+                {erroApi !== "" && (
+                  <Text style={[styles.erro, modoEscuro && styles.textoEscuro]}>
+                    {erroApi}
+                  </Text>
+                )}
+
+                {carregandoLocais && (
+                  <View style={styles.carregando}>
+                    <ActivityIndicator />
+
+                    <Text style={modoEscuro && styles.textoEscuro}>
+                      Procurando opções próximas...
+                    </Text>
+                  </View>
+                )}
+
+                {locais.length > 0 && (
+                  <ResultadoLocais
+                    titulo={
+                      atividadeEscolhida?.id === "cafe"
+                        ? "Cafeterias próximas"
+                        : atividadeEscolhida?.id === "parque"
+                          ? "Parques próximos"
+                          : atividadeEscolhida?.id === "cinema"
+                            ? "Cinemas próximos"
+                            : atividadeEscolhida?.id === "passeio"
+                              ? "Lugares próximos"
+                              : atividadeEscolhida?.id === "restaurante"
+                                ? "Restaurantes próximos"
+                                : "Opções próximas"
+                    }
+                    locais={locais}
+                    latitude={latitude ?? 0}
+                    longitude={longitude ?? 0}
+                    mostrarMapa
+                  />
+                )}
+
+                {atividadeEscolhida?.id === "cinema" && (
+                  <View style={styles.blocoResultado}>
+                    {carregandoFilmes ? (
+                      <View style={styles.carregando}>
+                        <ActivityIndicator />
+
+                        <Text style={modoEscuro && styles.textoEscuro}>
+                          Procurando filmes...
+                        </Text>
+                      </View>
+                    ) : (
+                      <ResultadoFilmes
+                        filmes={filmes}
+                        titulo="Filmes para assistir no cinema"
+                        subtitulo="Depois de encontrar os cinemas, veja também algumas sugestões de filmes."
+                        mostrarCategorias
+                      />
+                    )}
+                  </View>
+                )}
+
+                <View style={styles.espacoGrande} />
+
+                <Button title="Começar novamente" onPress={reiniciar} />
+              </View>
+            )}
+          </View>
+        </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -2038,10 +2141,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
-    padding: 30,
-    maxWidth: 700,
     width: "100%",
     alignSelf: "center",
+  },
+
+  containerResultado: {
+    justifyContent: "flex-start",
   },
 
   containerClaro: {
@@ -2052,25 +2157,58 @@ const styles = StyleSheet.create({
     backgroundColor: "#121212",
   },
 
+  conteudoPrincipal: {
+    width: "100%",
+    maxWidth: 700,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+  },
+
+  resultadoScroll: {
+    flex: 1,
+    width: "100%",
+  },
+
+  resultadoScrollFundo: {
+    width: "100%",
+    alignItems: "center",
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+
+  resultadoScrollConteudo: {
+    width: "100%",
+    maxWidth: 1000,
+    alignSelf: "center",
+    minWidth: 0,
+  },
+
   titulo: {
+    width: "100%",
     fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 15,
+    lineHeight: 34,
   },
 
   descricao: {
+    width: "100%",
     fontSize: 18,
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 25,
+    flexShrink: 1,
   },
 
   descricaoMenor: {
+    width: "100%",
     fontSize: 16,
     textAlign: "center",
     marginBottom: 20,
     lineHeight: 22,
+    flexShrink: 1,
   },
 
   subtitulo: {
@@ -2098,8 +2236,11 @@ const styles = StyleSheet.create({
   },
 
   textoCard: {
+    width: "100%",
     fontSize: 16,
+    lineHeight: 22,
     marginBottom: 5,
+    flexShrink: 1,
   },
 
   espaco: {
@@ -2112,14 +2253,22 @@ const styles = StyleSheet.create({
 
   blocoDepois: {
     marginTop: 25,
+    width: "100%",
+  },
+
+  blocoResultado: {
+    width: "100%",
+    minWidth: 0,
   },
 
   resultado: {
+    width: "100%",
     fontSize: 18,
     marginTop: 10,
     marginBottom: 20,
     textAlign: "center",
     fontWeight: "bold",
+    flexShrink: 1,
   },
 
   codigo: {
@@ -2131,6 +2280,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
+    width: "100%",
     borderWidth: 1,
     borderColor: "#999999",
     borderRadius: 8,
@@ -2151,10 +2301,12 @@ const styles = StyleSheet.create({
   },
 
   aviso: {
+    width: "100%",
     fontSize: 16,
     textAlign: "center",
     marginBottom: 10,
     lineHeight: 22,
+    flexShrink: 1,
   },
 
   resposta: {
@@ -2178,6 +2330,7 @@ const styles = StyleSheet.create({
   textoResposta: {
     fontSize: 16,
     marginBottom: 4,
+    flexShrink: 1,
   },
 
   botaoTema: {
@@ -2199,11 +2352,14 @@ const styles = StyleSheet.create({
 
   carregando: {
     alignItems: "center",
+    justifyContent: "center",
     marginVertical: 20,
     gap: 10,
   },
 
   card: {
+    width: "100%",
+    minWidth: 0,
     borderWidth: 1,
     borderColor: "#999999",
     borderRadius: 10,
@@ -2216,18 +2372,25 @@ const styles = StyleSheet.create({
   },
 
   cardTitulo: {
+    width: "100%",
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
+    flexShrink: 1,
   },
 
   erro: {
+    width: "100%",
     marginTop: 15,
     fontWeight: "bold",
     textAlign: "center",
+    lineHeight: 22,
+    flexShrink: 1,
   },
 
   resultadoCard: {
+    width: "100%",
+    minWidth: 0,
     borderWidth: 2,
     borderColor: "#333333",
     borderRadius: 12,
@@ -2240,19 +2403,20 @@ const styles = StyleSheet.create({
   },
 
   resultadoTitulo: {
+    width: "100%",
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 10,
     textAlign: "center",
+    lineHeight: 30,
+    flexShrink: 1,
   },
 
   resultadoDescricao: {
+    width: "100%",
     fontSize: 16,
     lineHeight: 22,
     textAlign: "center",
-  },
-
-  blocoResultado: {
-    marginTop: 10,
+    flexShrink: 1,
   },
 });
