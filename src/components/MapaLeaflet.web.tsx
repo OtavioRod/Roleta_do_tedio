@@ -1,3 +1,4 @@
+import type { Map as LeafletMap } from "leaflet";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
@@ -15,15 +16,14 @@ type Props = {
   locais: Local[];
 };
 
-declare global {
-  interface Window {
-    L: any;
-  }
-}
-
-export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
+export default function MapaLeaflet({
+  latitude,
+  longitude,
+  locais,
+}: Props) {
   const mapaRef = useRef<HTMLDivElement | null>(null);
-  const instanciaMapa = useRef<any>(null);
+  const instanciaMapa = useRef<LeafletMap | null>(null);
+
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
 
@@ -35,40 +35,23 @@ export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
         setCarregando(true);
         setErro("");
 
-        if (!window.L) {
-          await new Promise<void>((resolve, reject) => {
-            const scriptExistente = document.querySelector(
-              'script[data-leaflet="true"]',
-            );
+        const leaflet = await import("leaflet");
+        const L = leaflet.default;
 
-            if (scriptExistente) {
-              scriptExistente.addEventListener("load", () => resolve());
-              scriptExistente.addEventListener("error", () =>
-                reject(new Error("Não foi possível carregar o Leaflet.")),
-              );
-              return;
-            }
-
-            const link = document.createElement("link");
-            link.rel = "stylesheet";
-            link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-            document.head.appendChild(link);
-
-            const script = document.createElement("script");
-            script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-            script.async = true;
-            script.setAttribute("data-leaflet", "true");
-
-            script.onload = () => resolve();
-            script.onerror = () =>
-              reject(new Error("Não foi possível carregar o Leaflet."));
-
-            document.body.appendChild(script);
-          });
+        if (!ativo || !mapaRef.current) {
+          return;
         }
 
-        if (!ativo || !mapaRef.current || !window.L) {
-          return;
+        if (!document.querySelector('link[data-leaflet-css="true"]')) {
+          const link = document.createElement("link");
+
+          link.rel = "stylesheet";
+          link.href =
+            "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+
+          link.setAttribute("data-leaflet-css", "true");
+
+          document.head.appendChild(link);
         }
 
         if (instanciaMapa.current) {
@@ -76,15 +59,20 @@ export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
           instanciaMapa.current = null;
         }
 
-        const L = window.L;
-
-        const mapa = L.map(mapaRef.current).setView([latitude, longitude], 14);
+        const mapa = L.map(mapaRef.current).setView(
+          [latitude, longitude],
+          14
+        );
 
         instanciaMapa.current = mapa;
 
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "&copy; OpenStreetMap contributors",
-        }).addTo(mapa);
+        L.tileLayer(
+          "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+          {
+            maxZoom: 19,
+            attribution: "&copy; OpenStreetMap contributors",
+          }
+        ).addTo(mapa);
 
         const iconeUsuario = L.icon({
           iconUrl:
@@ -108,18 +96,38 @@ export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
         locais.forEach((local) => {
           L.marker([local.latitude, local.longitude])
             .addTo(mapa)
-            .bindPopup(`<strong>${local.nome}</strong><br>${local.endereco}`);
+            .bindPopup(
+              `<strong>${local.nome}</strong><br>${local.endereco}`
+            );
         });
 
-        setCarregando(false);
-      } catch (error) {
-        if (!ativo) {
-          return;
+        if (locais.length > 0) {
+          const pontos = [
+            [latitude, longitude] as [number, number],
+            ...locais.map(
+              (local) =>
+                [local.latitude, local.longitude] as [
+                  number,
+                  number
+                ]
+            ),
+          ];
+
+          mapa.fitBounds(L.latLngBounds(pontos), {
+            padding: [30, 30],
+          });
         }
 
-        console.error(error);
-        setErro("Não foi possível carregar o mapa.");
-        setCarregando(false);
+        if (ativo) {
+          setCarregando(false);
+        }
+      } catch (error) {
+        console.error("Erro ao inicializar mapa:", error);
+
+        if (ativo) {
+          setErro("Não foi possível carregar o mapa.");
+          setCarregando(false);
+        }
       }
     }
 
@@ -182,7 +190,9 @@ export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
           }}
         >
           <ActivityIndicator size="large" />
-          <Text style={{ marginTop: 10 }}>Carregando mapa...</Text>
+          <Text style={{ marginTop: 10 }}>
+            Carregando mapa...
+          </Text>
         </View>
       )}
     </View>
