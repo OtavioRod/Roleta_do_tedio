@@ -164,77 +164,132 @@ export async function buscarLocais(
     console.log("Nenhum filtro encontrado para o tipo:", tipo);
 
     return [];
+  } try {
+    const resposta = await fetch(`${BACKEND_URL}/locais`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        latitude,
+        longitude,
+        tipo,
+        raio,
+        filtros,
+      }),
+    });
+
+    console.log("Status da resposta do backend:", resposta.status);
+
+    if (!resposta.ok) {
+      throw new Error(`Erro ao consultar backend: ${resposta.status}`);
+    }
+
+    const dados: RespostaOverpass = await resposta.json();
+
+    console.log(
+      "Quantidade de elementos encontrados:",
+      dados.elements.length,
+    );
+
+    console.log(
+      "Primeiros elementos encontrados:",
+      dados.elements.slice(0, 5),
+    );
+
+    const locais = dados.elements
+      .map(transformarElemento)
+      .filter((local): local is Local => local !== null);
+
+    console.log(
+      "Quantidade de locais após transformação:",
+      locais.length,
+    );
+
+    console.log("Locais transformados:", locais.slice(0, 5));
+
+    const locaisUnicos = locais.filter(
+      (local, index, lista) =>
+        lista.findIndex(
+          (item) =>
+            item.nome.toLowerCase() === local.nome.toLowerCase() &&
+            Math.abs(item.latitude - local.latitude) < 0.0001 &&
+            Math.abs(item.longitude - local.longitude) < 0.0001,
+        ) === index,
+    );
+
+    console.log(
+      "Quantidade de locais únicos:",
+      locaisUnicos.length,
+    );
+
+    console.log(
+      "Locais finais:",
+      locaisUnicos.slice(0, 20),
+    );
+
+    console.log("   FIM DA BUSCA OVERPASS   ");
+
+    return locaisUnicos.slice(0, 20);
+  } catch (erro) {
+    console.error("ERRO NA BUSCA OVERPASS:", erro);
+
+    throw erro;
   }
+}
 
-  //const consultas = filtros
-  //  .map((filtro) => `${filtro}(around:${raio},${latitude},${longitude});`)
-  //  .join("\n");
 
-  //const consulta = `
-  //  [out:json][timeout:40];
+const resposta = await fetch(`${BACKEND_URL}/locais`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    latitude,
+    longitude,
+    tipo,
+    raio,
+    filtros,
+  }),
+});
 
-  //  (
-  //    ${consultas}
-  //  );
+console.log("Status da resposta Overpass:", resposta.status);
 
-  //  out center tags;
-  //`;
+if (!resposta.ok) {
+  throw new Error(`Erro ao consultar Overpass: ${resposta.status}`);
+}
 
-  //console.log("Consulta enviada para o Overpass:");
+const dados: RespostaOverpass = await resposta.json();
 
-  //console.log(consulta);
+console.log("Quantidade de elementos encontrados:", dados.elements.length);
 
-  const resposta = await fetch(`${BACKEND_URL}/locais`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      latitude,
-      longitude,
-      tipo,
-      raio,
-      filtros,
-    }),
-  });
+console.log("Primeiros elementos encontrados:", dados.elements.slice(0, 5));
 
-  console.log("Status da resposta Overpass:", resposta.status);
+const locais = dados.elements
+  .map(transformarElemento)
+  .filter((local): local is Local => local !== null);
 
-  if (!resposta.ok) {
-    throw new Error(`Erro ao consultar Overpass: ${resposta.status}`);
-  }
+console.log("Quantidade de locais após transformação:", locais.length);
 
-  const dados: RespostaOverpass = await resposta.json();
+console.log("Locais transformados:", locais.slice(0, 5));
 
-  console.log("Quantidade de elementos encontrados:", dados.elements.length);
+const locaisUnicos = locais.filter(
+  (local, index, lista) =>
+    lista.findIndex(
+      (item) =>
+        item.nome.toLowerCase() === local.nome.toLowerCase() &&
+        Math.abs(item.latitude - local.latitude) < 0.0001 &&
+        Math.abs(item.longitude - local.longitude) < 0.0001,
+    ) === index,
+);
 
-  console.log("Primeiros elementos encontrados:", dados.elements.slice(0, 5));
+console.log("Quantidade de locais únicos:", locaisUnicos.length);
 
-  const locais = dados.elements
-    .map(transformarElemento)
-    .filter((local): local is Local => local !== null);
+console.log("Locais finais:", locaisUnicos.slice(0, 20));
 
-  console.log("Quantidade de locais após transformação:", locais.length);
+console.log("   FIM DA BUSCA OVERPASS   ");
 
-  console.log("Locais transformados:", locais.slice(0, 5));
-
-  const locaisUnicos = locais.filter(
-    (local, index, lista) =>
-      lista.findIndex(
-        (item) =>
-          item.nome.toLowerCase() === local.nome.toLowerCase() &&
-          Math.abs(item.latitude - local.latitude) < 0.0001 &&
-          Math.abs(item.longitude - local.longitude) < 0.0001,
-      ) === index,
-  );
-
-  console.log("Quantidade de locais únicos:", locaisUnicos.length);
-
-  console.log("Locais finais:", locaisUnicos.slice(0, 20));
-
-  console.log("   FIM DA BUSCA OVERPASS   ");
-
-  return locaisUnicos.slice(0, 20);
+return locaisUnicos.slice(0, 20);
 } catch (erro) {
   console.error("ERRO NA BUSCA OVERPASS:", erro);
 
