@@ -9,6 +9,92 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.post("/locais", async (req, res) => {
+  try {
+    const { latitude, longitude, tipo, raio = 10000, filtros } = req.body;
+
+    if (
+      typeof latitude !== "number" ||
+      typeof longitude !== "number" ||
+      !Array.isArray(filtros) ||
+      filtros.length === 0
+    ) {
+      return res.status(400).json({
+        mensagem: "Dados inválidos para busca de locais.",
+      });
+    }
+
+    //const consultas = filtros
+    //  .map(
+    //    (filtro) =>
+    //      `${filtro}(around:${raio},${latitude},${longitude});`,
+    //  )
+    //  .join("\n");
+
+    const consulta = `
+      [out:json][timeout:40];
+
+      (
+        ${consultas}
+      );
+
+      out center tags;
+    `;
+
+    console.log("Iniciando busca Overpass");
+    console.log("Tipo:", tipo);
+    console.log("Latitude:", latitude);
+    console.log("Longitude:", longitude);
+    console.log("Raio:", raio);
+    console.log("Consulta:", consulta);
+
+    const resposta = await fetch(
+      "https://roleta-do-tedio.onrender.com/locais",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          tipo,
+          raio,
+          filtros,
+        }),
+      },
+    );
+
+    console.log("Status Overpass:", resposta.status);
+
+    if (!resposta.ok) {
+      const texto = await resposta.text();
+
+      console.error("Erro retornado pelo Overpass:", texto);
+
+      return res.status(502).json({
+        mensagem: "Erro ao consultar Overpass.",
+        status: resposta.status,
+      });
+    }
+
+    const dados = await resposta.json();
+
+    console.log(
+      "Elementos encontrados:",
+      dados.elements?.length || 0,
+    );
+
+    res.json(dados);
+  } catch (error) {
+    console.error("Erro na rota /locais:", error);
+
+    res.status(500).json({
+      mensagem: "Erro ao buscar locais.",
+    });
+  }
+});
+
 app.get("/", (req, res) => {
   res.json({
     mensagem: "Backend da Roleta do Tédio funcionando!",
