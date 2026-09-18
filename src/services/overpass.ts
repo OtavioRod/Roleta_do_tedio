@@ -1,4 +1,4 @@
-const BACKEND_URL = "https://roleta-do-tedio.onrender.com";
+const BACKEND_URL = "http://localhost:3000";
 
 export type TipoLocal =
   | "restaurante"
@@ -49,8 +49,8 @@ function obterFiltros(tipo: TipoLocal): string[] {
     case "restaurante":
       return [
         'nwr["amenity"="restaurant"]',
-        'nwr["amenity"="fast_food"]',
-        'nwr["amenity"="food_court"]',
+        //'nwr["amenity"="fast_food"]',
+        //'nwr["amenity"="food_court"]',
       ];
 
     case "cafe":
@@ -143,7 +143,7 @@ export async function buscarLocais(
   latitude: number,
   longitude: number,
   tipo: TipoLocal,
-  raio = 10000,
+  raio = 5000,
 ): Promise<Local[]> {
   console.log("    INICIANDO BUSCA OVERPASS    ");
 

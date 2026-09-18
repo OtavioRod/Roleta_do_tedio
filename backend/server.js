@@ -11,7 +11,13 @@ app.use(express.json());
 
 app.post("/locais", async (req, res) => {
   try {
-    const { latitude, longitude, tipo, raio = 10000, filtros } = req.body;
+    const {
+      latitude,
+      longitude,
+      tipo,
+      raio = 5000,
+      filtros,
+    } = req.body;
 
     if (
       typeof latitude !== "number" ||
@@ -24,12 +30,12 @@ app.post("/locais", async (req, res) => {
       });
     }
 
-    //const consultas = filtros
-    //  .map(
-    //    (filtro) =>
-    //      `${filtro}(around:${raio},${latitude},${longitude});`,
-    //  )
-    //  .join("\n");
+    const consultas = filtros
+      .map(
+        (filtro) =>
+          `${filtro}(around:${raio},${latitude},${longitude});`
+      )
+      .join("\n");
 
     const consulta = `
       [out:json][timeout:40];
@@ -41,28 +47,25 @@ app.post("/locais", async (req, res) => {
       out center tags;
     `;
 
-    console.log("Iniciando busca Overpass");
+    console.log("=== INICIANDO BUSCA OVERPASS ===");
     console.log("Tipo:", tipo);
     console.log("Latitude:", latitude);
     console.log("Longitude:", longitude);
     console.log("Raio:", raio);
+    console.log("Filtros:", filtros);
     console.log("Consulta:", consulta);
 
     const resposta = await fetch(
-      "https://roleta-do-tedio.onrender.com/locais",
+      "https://overpass-api.de/api/interpreter",
       {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+          "Accept": "application/json",
+          "User-Agent": "Roleta-do-Tedio/1.0",
         },
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          tipo,
-          raio,
-          filtros,
-        }),
-      },
+        body: `data=${encodeURIComponent(consulta)}`,
+      }
     );
 
     console.log("Status Overpass:", resposta.status);
@@ -82,7 +85,7 @@ app.post("/locais", async (req, res) => {
 
     console.log(
       "Elementos encontrados:",
-      dados.elements?.length || 0,
+      dados.elements?.length || 0
     );
 
     res.json(dados);
@@ -94,7 +97,6 @@ app.post("/locais", async (req, res) => {
     });
   }
 });
-
 app.get("/", (req, res) => {
   res.json({
     mensagem: "Backend da Roleta do Tédio funcionando!",
