@@ -591,12 +591,8 @@ export default function Index() {
     return melhorModalidade;
   }
 
-  async function calcularModalidadeCafeComClima(lat: number, lon: number) {
+  async function calcularModalidadeCafeComClima(climaAtual: Clima) {
     try {
-      const climaAtual = await buscarClimaService(lat, lon);
-
-      setClima(climaAtual);
-
       const modalidades = atividadeEscolhida?.modalidades ?? [];
 
       let melhor: Modalidade | null = null;
@@ -776,16 +772,6 @@ export default function Index() {
     return false;
   }
 
-  /*
-   * CORREÇÃO PRINCIPAL:
-   *
-   * Agora podemos informar diretamente o tipo de local
-   * quando ele já é conhecido.
-   *
-   * Isso resolve o problema do cafe-fora, pois não
-   * dependemos de esperar o setModalidadeEscolhida()
-   * atualizar o estado antes de consultar o Overpass.
-   */
   async function buscarLocaisProximos(
     lat: number,
     lon: number,
@@ -1062,11 +1048,11 @@ export default function Index() {
 
       console.log("Localização obtida:", lat, lon);
 
-      if (atividadeEscolhida?.id === "cafe") {
-        const climaAtual = await buscarClima(lat, lon);
+      const climaAtual = await buscarClima(lat, lon);
 
+      if (atividadeEscolhida?.id === "cafe") {
         const modalidade = climaAtual
-          ? await calcularModalidadeCafeComClima(lat, lon)
+          ? await calcularModalidadeCafeComClima(climaAtual)
           : calcularModalidadeCafe();
 
         console.log("Modalidade de café escolhida:", modalidade?.id);
@@ -1085,12 +1071,6 @@ export default function Index() {
         }
 
         if (modalidade?.id === "cafe-fora") {
-          /*
-           * CORREÇÃO:
-           *
-           * Não esperamos o estado modalidadeEscolhida
-           * ser atualizado. Já sabemos que o tipo é cafe.
-           */
           await buscarLocaisProximos(lat, lon, "cafe");
 
           return;
@@ -1240,35 +1220,28 @@ export default function Index() {
             Quem está prestes a reclamar que "não tem nada para fazer"?
           </Text>
 
-          <Button title="Casal" onPress={() => escolherTipo("casal")} />
+          {tipo === "" ? (
+            <>
+              <Button title="Casal" onPress={() => escolherTipo("casal")} />
 
-          <View style={styles.espaco} />
+              <View style={styles.espaco} />
 
-          <Button title="Amigos" onPress={() => escolherTipo("amigos")} />
+              <Button title="Amigos" onPress={() => escolherTipo("amigos")} />
 
-          <View style={styles.espaco} />
+              <View style={styles.espaco} />
 
-          <Button title="Sozinho" onPress={() => escolherTipo("sozinho")} />
-
-          {tipo !== "" && (
+              <Button title="Sozinho" onPress={() => escolherTipo("sozinho")} />
+            </>
+          ) : (
             <View style={styles.blocoDepois}>
-              <Text
-                style={[styles.resultado, modoEscuro && styles.textoEscuro]}
-              >
-                Então é um{" "}
-                {tipo === "casal"
-                  ? "casal"
-                  : tipo === "amigos"
-                    ? "grupo de amigos"
-                    : "momento solo"}
-                .
-              </Text>
-
               <Text
                 style={[styles.descricao, modoEscuro && styles.textoEscuro]}
               >
-                Agora diga quem é você. A roleta precisa saber quem está por
-                trás dessas decisões.
+                {tipo === "casal"
+                  ? "Qual é o nome de vocês?"
+                  : tipo === "amigos"
+                    ? "Qual é o nome do grupo?"
+                    : "Qual é o seu nome?"}
               </Text>
 
               <TextInput
