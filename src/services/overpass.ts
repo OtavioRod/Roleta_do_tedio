@@ -144,9 +144,7 @@ export async function buscarLocais(
   tipo: TipoLocal,
   raio = 10000,
 ): Promise<Local[]> {
-  console.log("================================");
-
-  console.log("=== INICIANDO BUSCA OVERPASS ===");
+  console.log("    INICIANDO BUSCA OVERPASS    ");
 
   console.log("Tipo recebido:", tipo);
 
@@ -185,9 +183,14 @@ export async function buscarLocais(
   console.log(consulta);
 
   try {
-    const resposta = await fetch(
-      `${OVERPASS_URL}?data=${encodeURIComponent(consulta)}`,
-    );
+    const resposta = await fetch(OVERPASS_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "User-Agent": "RoletaDoTedio/1.0",
+      },
+      body: `data=${encodeURIComponent(consulta)}`,
+    });
 
     console.log("Status da resposta Overpass:", resposta.status);
 
@@ -223,9 +226,7 @@ export async function buscarLocais(
 
     console.log("Locais finais:", locaisUnicos.slice(0, 20));
 
-    console.log("=== FIM DA BUSCA OVERPASS ===");
-
-    console.log("================================");
+    console.log("   FIM DA BUSCA OVERPASS   ");
 
     return locaisUnicos.slice(0, 20);
   } catch (erro) {
