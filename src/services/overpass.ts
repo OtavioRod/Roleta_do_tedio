@@ -1,3 +1,5 @@
+const BACKEND_URL = "https://roleta-do-tedio.onrender.com";
+
 export type TipoLocal =
   | "restaurante"
   | "cafe"
@@ -40,7 +42,7 @@ type RespostaOverpass = {
   elements: ElementoOverpass[];
 };
 
-const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
+//const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
 function obterFiltros(tipo: TipoLocal): string[] {
   switch (tipo) {
@@ -164,74 +166,78 @@ export async function buscarLocais(
     return [];
   }
 
-  const consultas = filtros
-    .map((filtro) => `${filtro}(around:${raio},${latitude},${longitude});`)
-    .join("\n");
+  //const consultas = filtros
+  //  .map((filtro) => `${filtro}(around:${raio},${latitude},${longitude});`)
+  //  .join("\n");
 
-  const consulta = `
-    [out:json][timeout:40];
+  //const consulta = `
+  //  [out:json][timeout:40];
 
-    (
-      ${consultas}
-    );
+  //  (
+  //    ${consultas}
+  //  );
 
-    out center tags;
-  `;
+  //  out center tags;
+  //`;
 
-  console.log("Consulta enviada para o Overpass:");
+  //console.log("Consulta enviada para o Overpass:");
 
-  console.log(consulta);
+  //console.log(consulta);
 
-  try {
-    const resposta = await fetch(OVERPASS_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "User-Agent": "RoletaDoTedio/1.0",
-      },
-      body: `data=${encodeURIComponent(consulta)}`,
-    });
+  const resposta = await fetch(`${BACKEND_URL}/locais`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      latitude,
+      longitude,
+      tipo,
+      raio,
+      filtros,
+    }),
+  });
 
-    console.log("Status da resposta Overpass:", resposta.status);
+  console.log("Status da resposta Overpass:", resposta.status);
 
-    if (!resposta.ok) {
-      throw new Error(`Erro ao consultar Overpass: ${resposta.status}`);
-    }
-
-    const dados: RespostaOverpass = await resposta.json();
-
-    console.log("Quantidade de elementos encontrados:", dados.elements.length);
-
-    console.log("Primeiros elementos encontrados:", dados.elements.slice(0, 5));
-
-    const locais = dados.elements
-      .map(transformarElemento)
-      .filter((local): local is Local => local !== null);
-
-    console.log("Quantidade de locais após transformação:", locais.length);
-
-    console.log("Locais transformados:", locais.slice(0, 5));
-
-    const locaisUnicos = locais.filter(
-      (local, index, lista) =>
-        lista.findIndex(
-          (item) =>
-            item.nome.toLowerCase() === local.nome.toLowerCase() &&
-            Math.abs(item.latitude - local.latitude) < 0.0001 &&
-            Math.abs(item.longitude - local.longitude) < 0.0001,
-        ) === index,
-    );
-
-    console.log("Quantidade de locais únicos:", locaisUnicos.length);
-
-    console.log("Locais finais:", locaisUnicos.slice(0, 20));
-
-    console.log("   FIM DA BUSCA OVERPASS   ");
-
-    return locaisUnicos.slice(0, 20);
-  } catch (erro) {
-    console.error("ERRO NA BUSCA OVERPASS:", erro);
-
-    throw erro;
+  if (!resposta.ok) {
+    throw new Error(`Erro ao consultar Overpass: ${resposta.status}`);
   }
+
+  const dados: RespostaOverpass = await resposta.json();
+
+  console.log("Quantidade de elementos encontrados:", dados.elements.length);
+
+  console.log("Primeiros elementos encontrados:", dados.elements.slice(0, 5));
+
+  const locais = dados.elements
+    .map(transformarElemento)
+    .filter((local): local is Local => local !== null);
+
+  console.log("Quantidade de locais após transformação:", locais.length);
+
+  console.log("Locais transformados:", locais.slice(0, 5));
+
+  const locaisUnicos = locais.filter(
+    (local, index, lista) =>
+      lista.findIndex(
+        (item) =>
+          item.nome.toLowerCase() === local.nome.toLowerCase() &&
+          Math.abs(item.latitude - local.latitude) < 0.0001 &&
+          Math.abs(item.longitude - local.longitude) < 0.0001,
+      ) === index,
+  );
+
+  console.log("Quantidade de locais únicos:", locaisUnicos.length);
+
+  console.log("Locais finais:", locaisUnicos.slice(0, 20));
+
+  console.log("   FIM DA BUSCA OVERPASS   ");
+
+  return locaisUnicos.slice(0, 20);
+} catch (erro) {
+  console.error("ERRO NA BUSCA OVERPASS:", erro);
+
+  throw erro;
+}
 }
