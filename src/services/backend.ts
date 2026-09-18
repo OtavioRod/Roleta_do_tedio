@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000";
+const API_URL = "https://roleta-do-tedio.onrender.com";
 
 export type Sessao = {
   id: number;
