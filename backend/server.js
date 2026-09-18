@@ -9,6 +9,71 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+async function consultarOverpass(consulta) {
+  const servidores = [
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.osm.jp/api/interpreter",
+  ];
+
+  let ultimoErro = null;
+
+  for (const servidor of servidores) {
+    try {
+      console.log(`Tentando Overpass: ${servidor}`);
+
+      const resposta = await fetch(servidor, {
+        method: "POST",
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded; charset=UTF-8",
+          "Accept": "application/json",
+          "User-Agent": "Roleta-do-Tedio/1.0",
+        },
+        body: `data=${encodeURIComponent(consulta)}`,
+      });
+
+      console.log(
+        `Status ${servidor}: ${resposta.status}`
+      );
+
+      if (!resposta.ok) {
+        const texto = await resposta.text();
+
+        console.error(
+          `Erro no servidor ${servidor}:`,
+          texto
+        );
+
+        ultimoErro = new Error(
+          `Overpass respondeu ${resposta.status}`
+        );
+
+        continue;
+      }
+
+      const dados = await resposta.json();
+
+      console.log(
+        `Sucesso usando: ${servidor}`
+      );
+
+      return dados;
+    } catch (erro) {
+      console.error(
+        `Falha ao acessar ${servidor}:`,
+        erro
+      );
+
+      ultimoErro = erro;
+    }
+  }
+
+  throw ultimoErro || new Error("Todos os servidores Overpass falharam.");
+}
+
 app.post("/locais", async (req, res) => {
   try {
     const {
@@ -55,33 +120,7 @@ app.post("/locais", async (req, res) => {
     console.log("Filtros:", filtros);
     console.log("Consulta:", consulta);
 
-    const resposta = await fetch(
-      "https://overpass.private.coffee/api/interpreter",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-          "Accept": "application/json",
-          "User-Agent": "Roleta-do-Tedio/1.0",
-        },
-        body: `data=${encodeURIComponent(consulta)}`,
-      }
-    );
-
-    console.log("Status Overpass:", resposta.status);
-
-    if (!resposta.ok) {
-      const texto = await resposta.text();
-
-      console.error("Erro retornado pelo Overpass:", texto);
-
-      return res.status(502).json({
-        mensagem: "Erro ao consultar Overpass.",
-        status: resposta.status,
-      });
-    }
-
-    const dados = await resposta.json();
+    const dados = await consultarOverpass(consulta);
 
     console.log(
       "Elementos encontrados:",
@@ -97,6 +136,9 @@ app.post("/locais", async (req, res) => {
     });
   }
 });
+
+
+
 app.get("/", (req, res) => {
   res.json({
     mensagem: "Backend da Roleta do Tédio funcionando!",
