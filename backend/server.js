@@ -56,7 +56,7 @@ app.post("/locais", async (req, res) => {
     console.log("Consulta:", consulta);
 
     const resposta = await fetch(
-      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
       {
         method: "POST",
         headers: {
