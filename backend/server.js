@@ -9,6 +9,61 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+async function consultarServidorOverpass(servidor, consulta) {
+  const controlador = new AbortController();
+
+  const timeout = setTimeout(() => {
+    controlador.abort();
+  }, 12000);
+
+  try {
+    console.log(`Tentando Overpass: ${servidor}`);
+
+    const resposta = await fetch(servidor, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        Accept: "application/json",
+        "User-Agent": "Roleta-do-Tedio/1.0",
+      },
+      body: `data=${encodeURIComponent(consulta)}`,
+      signal: controlador.signal,
+    });
+
+    console.log(`Status ${servidor}: ${resposta.status}`);
+
+    if (!resposta.ok) {
+      const texto = await resposta.text();
+
+      console.error(`Erro no servidor ${servidor}:`, texto);
+
+      throw new Error(`Overpass respondeu ${resposta.status}`);
+    }
+
+    const dados = await resposta.json();
+
+    if (!dados || !Array.isArray(dados.elements)) {
+      throw new Error("Resposta inválida do Overpass.");
+    }
+
+    console.log(`Sucesso usando: ${servidor}`);
+
+    console.log(`Elementos encontrados em ${servidor}:`, dados.elements.length);
+
+    return dados;
+  } catch (erro) {
+    if (erro.name === "AbortError") {
+      console.error(`Timeout ao acessar ${servidor}`);
+    } else {
+      console.error(`Falha ao acessar ${servidor}:`, erro.message);
+    }
+
+    throw erro;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function consultarOverpass(consulta) {
   const servidores = [
     "https://overpass.private.coffee/api/interpreter",
@@ -18,66 +73,23 @@ async function consultarOverpass(consulta) {
     "https://overpass.osm.jp/api/interpreter",
   ];
 
-  let ultimoErro = null;
+  console.log("Iniciando consultas Overpass em paralelo...");
 
-  for (const servidor of servidores) {
-    try {
-      console.log(`Tentando Overpass: ${servidor}`);
+  const tentativas = servidores.map((servidor) =>
+    consultarServidorOverpass(servidor, consulta),
+  );
 
-      const controlador = new AbortController();
+  try {
+    const resultado = await Promise.any(tentativas);
 
-      const timeout = setTimeout(() => {
-        controlador.abort();
-      }, 30000);
+    console.log("Primeiro servidor Overpass respondeu com sucesso.");
 
-      let resposta;
+    return resultado;
+  } catch (erro) {
+    console.error("Todos os servidores Overpass falharam.");
 
-      try {
-        resposta = await fetch(servidor, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-            Accept: "application/json",
-            "User-Agent": "Roleta-do-Tedio/1.0",
-          },
-          body: `data=${encodeURIComponent(consulta)}`,
-          signal: controlador.signal,
-        });
-      } finally {
-        clearTimeout(timeout);
-      }
-
-      console.log(`Status ${servidor}: ${resposta.status}`);
-
-      if (!resposta.ok) {
-        const texto = await resposta.text();
-
-        console.error(`Erro no servidor ${servidor}:`, texto);
-
-        ultimoErro = new Error(`Overpass respondeu ${resposta.status}`);
-
-        continue;
-      }
-
-      const dados = await resposta.json();
-
-      console.log(`Sucesso usando: ${servidor}`);
-
-      return dados;
-    } catch (erro) {
-      if (erro.name === "AbortError") {
-        console.error(`Timeout ao acessar ${servidor}`);
-
-        ultimoErro = new Error(`Timeout ao acessar ${servidor}`);
-      } else {
-        console.error(`Falha ao acessar ${servidor}:`, erro);
-
-        ultimoErro = erro;
-      }
-    }
+    throw new Error("Todos os servidores Overpass falharam.");
   }
-
-  throw ultimoErro || new Error("Todos os servidores Overpass falharam.");
 }
 
 app.post("/locais", async (req, res) => {
@@ -100,7 +112,7 @@ app.post("/locais", async (req, res) => {
       .join("\n");
 
     const consulta = `
-      [out:json][timeout:30];
+      [out:json][timeout:15];
 
       (
         ${consultas}
@@ -110,6 +122,7 @@ app.post("/locais", async (req, res) => {
     `;
 
     console.log("=== INICIANDO BUSCA OVERPASS ===");
+
     console.log("Tipo:", tipo);
     console.log("Latitude:", latitude);
     console.log("Longitude:", longitude);
@@ -117,9 +130,15 @@ app.post("/locais", async (req, res) => {
     console.log("Filtros:", filtros);
     console.log("Consulta:", consulta);
 
+    const inicio = Date.now();
+
     const dados = await consultarOverpass(consulta);
 
-    console.log("Elementos encontrados:", dados.elements?.length || 0);
+    const tempo = ((Date.now() - inicio) / 1000).toFixed(2);
+
+    console.log(`Busca Overpass concluída em ${tempo}s`);
+
+    console.log("Elementos encontrados:", dados.elements.length);
 
     res.json(dados);
   } catch (error) {
@@ -166,10 +185,12 @@ app.post("/sessoes", async (req, res) => {
 
     const resultado = await pool.query(
       `
-      INSERT INTO sessoes (atividade, modalidade)
-      VALUES ($1, $2)
-      RETURNING *
-      `,
+        INSERT INTO sessoes
+          (atividade, modalidade)
+        VALUES
+          ($1, $2)
+        RETURNING *
+        `,
       [atividade, modalidade || null],
     );
 
