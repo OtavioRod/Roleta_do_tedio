@@ -1,4 +1,4 @@
-const BACKEND_URL = "http://localhost:3000";
+const BACKEND_URL = "https://roleta-do-tedio.onrender.com";
 
 export type TipoLocal =
   | "restaurante"
