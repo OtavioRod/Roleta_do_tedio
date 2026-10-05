@@ -1,5 +1,5 @@
 import * as Location from "expo-location";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ActivityIndicator,
   Button,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 
 import ParticipanteItem from "../components/ParticipanteItem";
 import ResultadoEventos from "../components/ResultadoEventos";
@@ -98,6 +99,8 @@ export default function Index() {
   const [carregandoRoleta, setCarregandoRoleta] = useState(false);
 
   const [erroApi, setErroApi] = useState("");
+
+  const roletaEmProcessamento = useRef(false);
 
   function comecar() {
     setIniciou(true);
@@ -464,10 +467,12 @@ export default function Index() {
     return pontos;
   }
 
-  async function escolherAtividade() {
-    if (carregandoRoleta) {
+  function escolherAtividade() {
+    if (roletaEmProcessamento.current) {
       return;
     }
+
+    roletaEmProcessamento.current = true;
 
     setCarregandoRoleta(true);
     setErroApi("");
@@ -502,14 +507,15 @@ export default function Index() {
 
     setAtividadeEscolhida(escolhida);
 
-    try {
-      await salvarSessao(escolhida.nome, tipo);
-    } catch (erro) {
-      console.error("Não foi possível salvar a sessão:", erro);
-    }
-
     setCarregandoRoleta(false);
+
     setEtapa("resultado");
+
+    roletaEmProcessamento.current = false;
+
+    void salvarSessao(escolhida.nome, tipo).catch((erro) => {
+      console.error("Não foi possível salvar a sessão:", erro);
+    });
   }
 
   function calcularModalidadeCafe() {
@@ -1170,6 +1176,7 @@ export default function Index() {
     setCarregandoEventos(false);
     setCarregandoReceitas(false);
     setCarregandoJogos(false);
+    roletaEmProcessamento.current = false;
   }
 
   const participante = participantes[participanteAtual];
