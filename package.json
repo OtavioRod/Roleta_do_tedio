@@ -5,17 +5,29 @@
   "dependencies": {
     "@expo/log-box": "^57.0.4",
     "@expo/router-server": "^57.0.10",
+<<<<<<< HEAD
     "@expo/ui": "~57.0.21",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.26",
+=======
+    "@expo/ui": "~57.0.22",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.27",
+>>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
     "expo-constants": "~57.0.14",
     "expo-device": "~57.0.2",
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.4",
     "expo-image": "~57.0.5",
+<<<<<<< HEAD
     "expo-linking": "~57.0.11",
     "expo-location": "~57.0.20",
     "expo-router": "~57.0.24",
+=======
+    "expo-linking": "~57.0.12",
+    "expo-location": "~57.0.20",
+    "expo-router": "~57.0.25",
+>>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.3",
