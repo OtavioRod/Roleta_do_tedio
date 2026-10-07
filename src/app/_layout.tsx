@@ -1,36 +1,39 @@
-<<<<<<< HEAD
-import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router";
-=======
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from "expo-router";
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
 import * as SplashScreen from "expo-splash-screen";
-import { useColorScheme } from "react-native";
+import { View } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
-<<<<<<< HEAD
-import AppTabs from "@/components/app-tabs";
-import { AccessibilityProvider } from "@/context/AccessibilityContext";
-=======
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
+import PainelAcessibilidade from "@/components/PainelAcessibilidade";
+import VLibrasWidget from "@/components/VLibrasWidget";
+import {
+  PreferenciasProvider,
+  usePreferencias,
+} from "@/context/PreferenciasContext";
 
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+function Conteudo() {
+  const { tema, cores } = usePreferencias();
 
   return (
-<<<<<<< HEAD
-    <AccessibilityProvider>
-      <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-        <AnimatedSplashOverlay />
-        <AppTabs />
-      </ThemeProvider>
-    </AccessibilityProvider>
-=======
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={tema === "escuro" ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
-      <Slot />
+
+      <View style={{ flex: 1, backgroundColor: cores.fundo }}>
+        <Slot />
+
+        <PainelAcessibilidade />
+      </View>
+
+      <VLibrasWidget />
     </ThemeProvider>
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <PreferenciasProvider>
+      <Conteudo />
+    </PreferenciasProvider>
   );
 }

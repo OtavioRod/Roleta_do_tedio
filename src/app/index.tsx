@@ -1,13 +1,8 @@
 import * as Location from "expo-location";
-<<<<<<< HEAD
-import { useRef, useState } from "react";
-=======
 import { useEffect, useRef, useState } from "react";
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  Button,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -15,20 +10,20 @@ import {
   ScrollView,
   StyleProp,
   StyleSheet,
-  Text,
   TextInput,
   TextStyle,
-  TouchableOpacity,
   View,
 } from "react-native";
 
-
+import Botao from "../components/Botao";
 import ParticipanteItem from "../components/ParticipanteItem";
 import ResultadoEventos from "../components/ResultadoEventos";
 import ResultadoFilmes from "../components/ResultadoFilmes";
 import ResultadoJogos from "../components/ResultadoJogos";
 import ResultadoLocais from "../components/ResultadoLocais";
 import ResultadoReceitas from "../components/ResultadoReceitas";
+import Texto from "../components/Texto";
+import { usePreferencias } from "../context/PreferenciasContext";
 
 import { Atividade, atividades, Gasto, Modalidade } from "../data/atividades";
 
@@ -333,6 +328,7 @@ type TextoDigitadoProps = {
   estilo?: StyleProp<TextStyle>;
   atraso?: number;
   velocidade?: number;
+  cabecalho?: boolean;
 };
 
 function TextoDigitado({
@@ -340,6 +336,7 @@ function TextoDigitado({
   estilo,
   atraso = 0,
   velocidade = VELOCIDADE_DIGITACAO,
+  cabecalho,
 }: TextoDigitadoProps) {
   const [quantidade, setQuantidade] = useState(0);
 
@@ -380,10 +377,10 @@ function TextoDigitado({
   }, [texto, atraso, velocidade, reduzirMovimento]);
 
   return (
-    <Text style={estilo} accessibilityLabel={texto}>
+    <Texto style={estilo} accessibilityLabel={texto} cabecalho={cabecalho}>
       {texto.slice(0, quantidade)}
-      <Text style={styles.textoInvisivel}>{texto.slice(quantidade)}</Text>
-    </Text>
+      <Texto style={styles.textoInvisivel}>{texto.slice(quantidade)}</Texto>
+    </Texto>
   );
 }
 
@@ -391,14 +388,12 @@ type PerguntaAnimadaProps = {
   titulo: string;
   descricao?: string;
   descricaoMenor?: string;
-  modoEscuro: boolean;
 };
 
 function PerguntaAnimada({
   titulo,
   descricao,
   descricaoMenor,
-  modoEscuro,
 }: PerguntaAnimadaProps) {
   const atrasoDescricao = titulo.length * VELOCIDADE_DIGITACAO;
 
@@ -407,16 +402,13 @@ function PerguntaAnimada({
 
   return (
     <>
-      <TextoDigitado
-        texto={titulo}
-        estilo={[styles.titulo, modoEscuro && styles.textoEscuro]}
-      />
+      <TextoDigitado cabecalho texto={titulo} estilo={styles.titulo} />
 
       {descricao ? (
         <TextoDigitado
           texto={descricao}
           atraso={atrasoDescricao}
-          estilo={[styles.descricao, modoEscuro && styles.textoEscuro]}
+          estilo={styles.descricao}
         />
       ) : null}
 
@@ -424,22 +416,88 @@ function PerguntaAnimada({
         <TextoDigitado
           texto={descricaoMenor}
           atraso={atrasoDescricaoMenor}
-          estilo={[styles.descricaoMenor, modoEscuro && styles.textoEscuro]}
+          estilo={styles.descricaoMenor}
         />
       ) : null}
     </>
   );
 }
 
+type CampoTextoProps = {
+  valor: string;
+  aoMudar: (texto: string) => void;
+  aoEnviar: () => void;
+  placeholder: string;
+  rotulo: string;
+};
+
+function CampoTexto({
+  valor,
+  aoMudar,
+  aoEnviar,
+  placeholder,
+  rotulo,
+}: CampoTextoProps) {
+  const { cores, escala } = usePreferencias();
+
+  return (
+    <TextInput
+      style={[
+        styles.input,
+        {
+          color: cores.texto,
+          borderColor: cores.borda,
+          backgroundColor: cores.fundo,
+          fontSize: 18 * escala,
+        },
+      ]}
+      placeholder={placeholder}
+      placeholderTextColor={cores.textoSecundario}
+      value={valor}
+      onChangeText={aoMudar}
+      maxLength={30}
+      autoCapitalize="words"
+      returnKeyType="done"
+      onSubmitEditing={aoEnviar}
+      accessibilityLabel={rotulo}
+    />
+  );
+}
+
+type CarregandoProps = {
+  texto: string;
+  grande?: boolean;
+};
+
+function Carregando({ texto, grande }: CarregandoProps) {
+  const { cores } = usePreferencias();
+
+  return (
+    <View
+      style={styles.carregando}
+      accessibilityRole="progressbar"
+      accessibilityLabel={texto}
+      accessibilityLiveRegion="polite"
+    >
+      <ActivityIndicator
+        size={grande ? "large" : "small"}
+        color={cores.destaque}
+      />
+
+      <Texto>{texto}</Texto>
+    </View>
+  );
+}
+
 export default function Index() {
+  const { cores, escala } = usePreferencias();
+
   const [iniciou, setIniciou] = useState(false);
   const [tipo, setTipo] = useState<Tipo | "">("");
   const [salaCriada, setSalaCriada] = useState(false);
   const [codigoSala, setCodigoSala] = useState("");
 
   const [etapa, setEtapa] = useState<Etapa>("sala");
-
-  const [modoEscuro, setModoEscuro] = useState(false);
 
   const [nomeParticipante, setNomeParticipante] = useState("");
 
@@ -487,21 +545,24 @@ export default function Index() {
 
   const [erroApi, setErroApi] = useState("");
 
-<<<<<<< HEAD
-  const roletaEmProcessamento = useRef(false);
-
-  function comecar() {
-    setIniciou(true);
-  }
-=======
   const [erroClima, setErroClima] = useState("");
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
 
   const [erroFilmes, setErroFilmes] = useState("");
 
   const [permissaoNegada, setPermissaoNegada] = useState(false);
 
   const execucaoId = useRef(0);
+
+  const estiloErro = [styles.erro, { color: cores.erro }];
+
+  const estiloCard = [styles.card, { borderColor: cores.borda }];
+
+  const estiloResposta = [styles.resposta, { borderColor: cores.borda }];
+
+  const estiloResultadoCard = [
+    styles.resultadoCard,
+    { borderColor: cores.texto },
+  ];
 
   function criarSala() {
     const nome = nomeParticipante.trim();
@@ -658,10 +719,6 @@ export default function Index() {
     );
   }
 
-  function alternarTema() {
-    setModoEscuro((anterior) => !anterior);
-  }
-
   function menorTempoDisponivel() {
     let menor = 999;
 
@@ -768,16 +825,6 @@ export default function Index() {
     return pontos;
   }
 
-<<<<<<< HEAD
-  function escolherAtividade() {
-    if (roletaEmProcessamento.current) {
-      return;
-    }
-
-    roletaEmProcessamento.current = true;
-
-    setCarregandoRoleta(true);
-=======
   function salvarSessaoSemBloquear(nomeAtividade: string, tipoSala: string) {
     (async () => {
       try {
@@ -789,7 +836,6 @@ export default function Index() {
   }
 
   function escolherAtividade() {
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
     setErroApi("");
     setModalidadeEscolhida(null);
 
@@ -824,22 +870,9 @@ export default function Index() {
     }
 
     setAtividadeEscolhida(escolhida);
-<<<<<<< HEAD
-
-    setCarregandoRoleta(false);
-
-    setEtapa("resultado");
-
-    roletaEmProcessamento.current = false;
-
-    void salvarSessao(escolhida.nome, tipo).catch((erro) => {
-      console.error("Não foi possível salvar a sessão:", erro);
-    });
-=======
     setEtapa("resultado");
 
     salvarSessaoSemBloquear(escolhida.nome, tipo);
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
   }
 
   function calcularModalidadeCafe(): Modalidade | null {
@@ -1606,37 +1639,30 @@ export default function Index() {
     setCarregandoFilmes(false);
     setCarregandoEventos(false);
     setCarregandoReceitas(false);
-<<<<<<< HEAD
-    setCarregandoJogos(false);
-    roletaEmProcessamento.current = false;
-=======
->>>>>>> 8e67322 (corrigindo antes de Aplicar a acessibilidade)
   }
 
   function renderAcoesDeErro(aoTentar: () => void) {
     return (
       <View style={styles.blocoDepois}>
-        <Button title="Tentar novamente" onPress={aoTentar} />
+        <Botao titulo="Tentar novamente" onPress={aoTentar} />
 
         {permissaoNegada && Platform.OS !== "web" && (
           <>
             <View style={styles.espaco} />
 
-            <Button title="Abrir configurações" onPress={abrirConfiguracoes} />
+            <Botao
+              titulo="Abrir configurações"
+              secundario
+              onPress={abrirConfiguracoes}
+            />
           </>
         )}
 
         {permissaoNegada && Platform.OS === "web" && (
-          <Text
-            style={[
-              styles.aviso,
-              styles.avisoComEspaco,
-              modoEscuro && styles.textoEscuro,
-            ]}
-          >
+          <Texto style={[styles.aviso, styles.avisoComEspaco]}>
             Clique no ícone de cadeado ao lado do endereço do site, permita a
             localização e depois toque em "Tentar novamente".
-          </Text>
+          </Texto>
         )}
       </View>
     );
@@ -1665,6 +1691,9 @@ export default function Index() {
     ? "Agora a roleta vai tentar descobrir se existe alguma coisa interessante perto de vocês."
     : "Confira abaixo o resultado da busca da roleta.";
 
+  const limiteParticipantes =
+    tipo === "sozinho" ? 1 : tipo === "casal" ? 2 : 10;
+
   return (
     <KeyboardAvoidingView
       style={styles.raiz}
@@ -1673,34 +1702,25 @@ export default function Index() {
       <View
         style={[
           styles.container,
-          modoEscuro ? styles.containerEscuro : styles.containerClaro,
+          { backgroundColor: cores.fundo },
           telaDeResultado && styles.containerResultado,
         ]}
       >
-        <TouchableOpacity
-          style={styles.botaoTema}
-          onPress={alternarTema}
-          accessibilityRole="button"
-          accessibilityLabel="Alternar tema claro e escuro"
-        >
-          <Text style={styles.iconeTema}>{modoEscuro ? "☀" : "☾"}</Text>
-        </TouchableOpacity>
-
         {!iniciou ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Roleta do Tédio
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               Vocês se juntaram e mesmo assim não sabem o que fazer?
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               Perfeito. Aparentemente pensar virou trabalho demais.
-            </Text>
+            </Texto>
 
-            <Button title="Começar" onPress={() => setIniciou(true)} />
+            <Botao titulo="Começar" onPress={() => setIniciou(true)} />
           </View>
         ) : !salaCriada ? (
           <View style={styles.conteudoPrincipal}>
@@ -1708,15 +1728,14 @@ export default function Index() {
               key="situacao"
               titulo="Primeiro, vamos entender a situação"
               descricao='Quem está prestes a reclamar que "não tem nada para fazer"?'
-              modoEscuro={modoEscuro}
             />
 
             {tipo === "" ? (
               <>
                 {OPCOES_TIPO.map((opcao) => (
                   <View key={opcao.valor} style={styles.opcaoBotao}>
-                    <Button
-                      title={opcao.rotulo}
+                    <Botao
+                      titulo={opcao.rotulo}
                       onPress={() => setTipo(opcao.valor)}
                     />
                   </View>
@@ -1727,66 +1746,59 @@ export default function Index() {
                 <TextoDigitado
                   key={tipo}
                   texto="Qual é o seu nome?"
-                  estilo={[styles.descricao, modoEscuro && styles.textoEscuro]}
+                  estilo={styles.descricao}
                 />
 
-                <TextInput
-                  style={[styles.input, modoEscuro && styles.inputEscuro]}
+                <CampoTexto
+                  valor={nomeParticipante}
+                  aoMudar={setNomeParticipante}
+                  aoEnviar={criarSala}
                   placeholder="Digite seu nome"
-                  placeholderTextColor={modoEscuro ? "#aaaaaa" : "#666666"}
-                  value={nomeParticipante}
-                  onChangeText={setNomeParticipante}
-                  maxLength={30}
-                  autoCapitalize="words"
-                  returnKeyType="done"
-                  onSubmitEditing={criarSala}
+                  rotulo="Seu nome"
                 />
 
-                <Button title="Criar sala" onPress={criarSala} />
+                <Botao titulo="Criar sala" onPress={criarSala} />
               </View>
             )}
           </View>
         ) : etapa === "sala" ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Sala criada
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
-              Este é o código da sua sala.
-            </Text>
+            <Texto style={styles.descricao}>Este é o código da sua sala.</Texto>
 
-            <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
+            <Texto
+              style={styles.codigo}
+              accessibilityLabel={`Código da sala: ${codigoSala.split("").join(" ")}`}
+            >
               {codigoSala}
-            </Text>
+            </Texto>
 
-            <Text style={[styles.subtitulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.subtitulo}>
               Participantes
-            </Text>
+            </Texto>
 
-            <Text style={[styles.contador, modoEscuro && styles.textoEscuro]}>
-              {participantes.length}
-              {tipo === "sozinho" && " / 1"}
-              {tipo === "casal" && " / 2"}
-              {tipo === "amigos" && " / 10"}
-            </Text>
+            <Texto
+              style={styles.contador}
+              accessibilityLabel={`${participantes.length} de ${limiteParticipantes} participantes`}
+            >
+              {participantes.length} / {limiteParticipantes}
+            </Texto>
 
             {tipo !== "sozinho" && (
               <>
-                <TextInput
-                  style={[styles.input, modoEscuro && styles.inputEscuro]}
+                <CampoTexto
+                  valor={nomeParticipante}
+                  aoMudar={setNomeParticipante}
+                  aoEnviar={adicionarParticipante}
                   placeholder="Nome de quem vai entrar"
-                  placeholderTextColor={modoEscuro ? "#aaaaaa" : "#666666"}
-                  value={nomeParticipante}
-                  onChangeText={setNomeParticipante}
-                  maxLength={30}
-                  autoCapitalize="words"
-                  returnKeyType="done"
-                  onSubmitEditing={adicionarParticipante}
+                  rotulo="Nome de quem vai entrar"
                 />
 
-                <Button
-                  title="Adicionar participante"
+                <Botao
+                  titulo="Adicionar participante"
                   onPress={adicionarParticipante}
                 />
               </>
@@ -1805,20 +1817,20 @@ export default function Index() {
             />
 
             {!podeContinuar() && (
-              <Text style={[styles.aviso, modoEscuro && styles.textoEscuro]}>
+              <Texto style={styles.aviso}>
                 {tipo === "casal" &&
                   "Falta uma pessoa. Afinal, casal exige duas pessoas."}
 
                 {tipo === "amigos" &&
                   participantes.length < 2 &&
                   "Adicione pelo menos mais uma pessoa para começar a confusão."}
-              </Text>
+              </Texto>
             )}
 
-            <Button
-              title="Continuar"
+            <Botao
+              titulo="Continuar"
               onPress={continuar}
-              disabled={!podeContinuar()}
+              desabilitado={!podeContinuar()}
             />
           </View>
         ) : etapa === "humor" ? (
@@ -1828,13 +1840,12 @@ export default function Index() {
               titulo={`Agora é pessoal, ${participanteDaVez?.nome ?? ""}`}
               descricao="Como você está agora?"
               descricaoMenor="Seja sincero. A roleta precisa saber com quem está lidando."
-              modoEscuro={modoEscuro}
             />
 
             {OPCOES_HUMOR.map((opcao) => (
               <View key={opcao.valor} style={styles.opcaoBotao}>
-                <Button
-                  title={opcao.rotulo}
+                <Botao
+                  titulo={opcao.rotulo}
                   onPress={() => escolherHumor(opcao.valor)}
                 />
               </View>
@@ -1842,24 +1853,24 @@ export default function Index() {
           </View>
         ) : etapa === "humorEscolhido" ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Entendido...
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               {participanteDaVez?.nome}, você está:
-            </Text>
+            </Texto>
 
-            <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.codigo}>
               {rotuloHumor(participanteDaVez?.humor ?? "")}
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               Interessante. Agora precisamos descobrir uma coisa importante:
               quanto dói no bolso?
-            </Text>
+            </Texto>
 
-            <Button title="Descobrir" onPress={() => setEtapa("gasto")} />
+            <Botao titulo="Descobrir" onPress={() => setEtapa("gasto")} />
           </View>
         ) : etapa === "gasto" ? (
           <View style={styles.conteudoPrincipal}>
@@ -1867,13 +1878,12 @@ export default function Index() {
               key={`gasto-${participanteAtual}`}
               titulo="Quanto você pretende gastar?"
               descricao="Pode ser sincero. A roleta não julga. Só usa essa informação contra o tédio."
-              modoEscuro={modoEscuro}
             />
 
             {OPCOES_GASTO.map((opcao) => (
               <View key={opcao.valor} style={styles.opcaoBotao}>
-                <Button
-                  title={opcao.botao}
+                <Botao
+                  titulo={opcao.botao}
                   onPress={() => escolherGasto(opcao.valor)}
                 />
               </View>
@@ -1881,24 +1891,24 @@ export default function Index() {
           </View>
         ) : etapa === "gastoEscolhido" ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Anotado...
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               {participanteDaVez?.nome}, seu orçamento é:
-            </Text>
+            </Texto>
 
-            <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.codigo}>
               {rotuloGasto(participanteDaVez?.gasto ?? "")}
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               Estamos chegando perto. Agora queremos saber se você realmente
               quer fazer alguma coisa.
-            </Text>
+            </Texto>
 
-            <Button title="Continuar" onPress={() => setEtapa("disposicao")} />
+            <Botao titulo="Continuar" onPress={() => setEtapa("disposicao")} />
           </View>
         ) : etapa === "disposicao" ? (
           <View style={styles.conteudoPrincipal}>
@@ -1906,13 +1916,12 @@ export default function Index() {
               key={`disposicao-${participanteAtual}`}
               titulo="Qual é a sua disposição?"
               descricao="O quanto você está disposto a sair da posição atual do sofá?"
-              modoEscuro={modoEscuro}
             />
 
             {OPCOES_DISPOSICAO.map((opcao) => (
               <View key={opcao.valor} style={styles.opcaoBotao}>
-                <Button
-                  title={opcao.rotulo}
+                <Botao
+                  titulo={opcao.rotulo}
                   onPress={() => escolherDisposicao(opcao.valor)}
                 />
               </View>
@@ -1920,24 +1929,24 @@ export default function Index() {
           </View>
         ) : etapa === "disposicaoEscolhida" ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Última pergunta...
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               {participanteDaVez?.nome}, sua disposição é:
-            </Text>
+            </Texto>
 
-            <Text style={[styles.codigo, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.codigo}>
               {rotuloDisposicao(participanteDaVez?.disposicao ?? "")}
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               Só falta descobrir quanto tempo vocês realmente têm.
-            </Text>
+            </Texto>
 
-            <Button
-              title="Descobrir meu tempo"
+            <Botao
+              titulo="Descobrir meu tempo"
               onPress={() => setEtapa("tempo")}
             />
           </View>
@@ -1947,13 +1956,12 @@ export default function Index() {
               key={`tempo-${participanteAtual}`}
               titulo="Quanto tempo você tem?"
               descricao="Escolha o tempo que você realmente tem disponível. Não vale colocar 3 horas se você precisa sair em 20 minutos."
-              modoEscuro={modoEscuro}
             />
 
             {OPCOES_TEMPO.map((opcao) => (
               <View key={opcao.valor} style={styles.opcaoBotao}>
-                <Button
-                  title={opcao.valor}
+                <Botao
+                  titulo={opcao.valor}
                   onPress={() => escolherTempo(opcao.valor)}
                 />
               </View>
@@ -1961,23 +1969,23 @@ export default function Index() {
           </View>
         ) : etapa === "tempoEscolhido" ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Perfeito...
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               {participanteDaVez?.nome} tem {participanteDaVez?.tempo}{" "}
               disponíveis.
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               {participanteAtual < participantes.length - 1
                 ? "Agora é a vez da próxima vítima."
                 : "Todos responderam. A roleta já tem informações suficientes para tomar uma decisão questionável."}
-            </Text>
+            </Texto>
 
-            <Button
-              title={
+            <Botao
+              titulo={
                 participanteAtual < participantes.length - 1
                   ? "Próximo participante"
                   : "Ver respostas"
@@ -1987,76 +1995,51 @@ export default function Index() {
           </View>
         ) : etapa === "resumo" ? (
           <View style={styles.conteudoPrincipal}>
-            <Text style={[styles.titulo, modoEscuro && styles.textoEscuro]}>
+            <Texto cabecalho style={styles.titulo}>
               Então é isso...
-            </Text>
+            </Texto>
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               A roleta já sabe demais sobre vocês.
-            </Text>
+            </Texto>
 
             <FlatList
               data={participantes}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View
-                  style={[styles.resposta, modoEscuro && styles.respostaEscuro]}
-                >
-                  <Text
-                    style={[
-                      styles.nomeResposta,
-                      modoEscuro && styles.textoEscuro,
-                    ]}
-                  >
-                    {item.nome}
-                  </Text>
+                <View style={estiloResposta}>
+                  <Texto style={styles.nomeResposta}>{item.nome}</Texto>
 
-                  <Text
-                    style={[
-                      styles.textoResposta,
-                      modoEscuro && styles.textoEscuro,
-                    ]}
-                  >
+                  <Texto style={styles.textoResposta}>
                     Humor: {rotuloHumor(item.humor)}
-                  </Text>
+                  </Texto>
 
-                  <Text
-                    style={[
-                      styles.textoResposta,
-                      modoEscuro && styles.textoEscuro,
-                    ]}
-                  >
+                  <Texto style={styles.textoResposta}>
                     Gasto: {rotuloGasto(item.gasto)}
-                  </Text>
+                  </Texto>
 
-                  <Text
-                    style={[
-                      styles.textoResposta,
-                      modoEscuro && styles.textoEscuro,
-                    ]}
-                  >
+                  <Texto style={styles.textoResposta}>
                     Disposição: {rotuloDisposicao(item.disposicao)}
-                  </Text>
+                  </Texto>
 
-                  <Text
-                    style={[
-                      styles.textoResposta,
-                      modoEscuro && styles.textoEscuro,
-                    ]}
-                  >
+                  <Texto style={styles.textoResposta}>
                     Tempo: {item.tempo}
-                  </Text>
+                  </Texto>
                 </View>
               )}
               style={styles.lista}
             />
 
-            <Text style={[styles.descricao, modoEscuro && styles.textoEscuro]}>
+            <Texto style={styles.descricao}>
               Tudo registrado. Agora vocês não podem mais dizer que a roleta não
               conhece vocês.
-            </Text>
+            </Texto>
 
-            <Button title="Girar a roleta" onPress={escolherAtividade} />
+            <Botao
+              titulo="Girar a roleta"
+              onPress={escolherAtividade}
+              dica="Sorteia uma atividade com base nas respostas de todos"
+            />
           </View>
         ) : telaDeResultado ? (
           <ScrollView
@@ -2069,67 +2052,40 @@ export default function Index() {
             <View style={styles.resultadoScrollConteudo}>
               {etapa === "resultado" ? (
                 <View style={styles.blocoResultado}>
-                  <Text
-                    style={[styles.titulo, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto cabecalho style={styles.titulo}>
                     A Roleta decidiu.
-                  </Text>
+                  </Texto>
 
-                  <Text
-                    style={[styles.descricao, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto style={styles.descricao}>
                     Depois de analisar todas as informações, ela chegou a uma
                     conclusão.
-                  </Text>
+                  </Texto>
 
-                  <View
-                    style={[
-                      styles.resultadoCard,
-                      modoEscuro && styles.resultadoCardEscuro,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.resultadoTitulo,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
+                  <View style={estiloResultadoCard}>
+                    <Texto cabecalho style={styles.resultadoTitulo}>
                       {atividadeEscolhida?.nome}
-                    </Text>
+                    </Texto>
 
-                    <Text
-                      style={[
-                        styles.resultadoDescricao,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
+                    <Texto style={styles.resultadoDescricao}>
                       {atividadeEscolhida?.descricao}
-                    </Text>
+                    </Texto>
                   </View>
 
                   {atividadeSemFiltro && (
-                    <Text
-                      style={[styles.aviso, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto style={styles.aviso}>
                       Nada combinou perfeitamente com as respostas de vocês,
                       então a roleta improvisou.
-                    </Text>
+                    </Texto>
                   )}
 
-                  <Text
-                    style={[styles.pergunta, modoEscuro && styles.textoEscuro]}
-                  >
-                    Tempo disponível:
-                  </Text>
+                  <Texto style={styles.pergunta}>Tempo disponível:</Texto>
 
-                  <Text
-                    style={[styles.subtitulo, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto style={styles.subtitulo}>
                     {menorTempoDisponivel()} minutos
-                  </Text>
+                  </Texto>
 
-                  <Button
-                    title={
+                  <Botao
+                    titulo={
                       ROTULO_BOTAO_RESULTADO[atividadeEscolhida?.id ?? ""] ??
                       "Encontrar opções próximas"
                     }
@@ -2138,71 +2094,43 @@ export default function Index() {
 
                   <View style={styles.espacoGrande} />
 
-                  <Button title="Girar novamente" onPress={escolherAtividade} />
+                  <Botao
+                    titulo="Girar novamente"
+                    secundario
+                    onPress={escolherAtividade}
+                  />
                 </View>
               ) : etapa === "resultadoModalidade" ? (
                 <View style={styles.blocoResultado}>
-                  <Text
-                    style={[styles.titulo, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto cabecalho style={styles.titulo}>
                     A Roleta pensou um pouco mais...
-                  </Text>
+                  </Texto>
 
-                  <Text
-                    style={[styles.descricao, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto style={styles.descricao}>
                     A atividade escolhida foi:
-                  </Text>
+                  </Texto>
 
-                  <View
-                    style={[
-                      styles.resultadoCard,
-                      modoEscuro && styles.resultadoCardEscuro,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.resultadoTitulo,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
+                  <View style={estiloResultadoCard}>
+                    <Texto cabecalho style={styles.resultadoTitulo}>
                       ☕ {atividadeEscolhida?.nome}
-                    </Text>
+                    </Texto>
 
-                    <Text
-                      style={[
-                        styles.resultadoDescricao,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
+                    <Texto style={styles.resultadoDescricao}>
                       {modalidadeEscolhida?.nome}
-                    </Text>
+                    </Texto>
 
-                    <Text
-                      style={[
-                        styles.textoCard,
-                        modoEscuro && styles.textoEscuro,
-                      ]}
-                    >
+                    <Texto style={styles.textoCard}>
                       {modalidadeEscolhida?.descricao}
-                    </Text>
+                    </Texto>
                   </View>
 
-                  <Text
-                    style={[styles.descricao, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto style={styles.descricao}>
                     Pelo tempo, disposição, dinheiro e clima de vocês, parece
                     que essa é a opção que faz mais sentido agora.
-                  </Text>
+                  </Texto>
 
                   {carregandoReceitas ? (
-                    <View style={styles.carregando}>
-                      <ActivityIndicator />
-
-                      <Text style={modoEscuro && styles.textoEscuro}>
-                        Procurando ideias para o café...
-                      </Text>
-                    </View>
+                    <Carregando texto="Procurando ideias para o café..." />
                   ) : (
                     <ResultadoReceitas
                       receitas={receitas}
@@ -2212,11 +2140,9 @@ export default function Index() {
                   )}
 
                   {erroApi !== "" && (
-                    <Text
-                      style={[styles.erro, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto accessibilityRole="alert" style={estiloErro}>
                       {erroApi}
-                    </Text>
+                    </Texto>
                   )}
 
                   {erroApi !== "" &&
@@ -2225,18 +2151,16 @@ export default function Index() {
 
                   <View style={styles.espacoGrande} />
 
-                  <Button title="Começar novamente" onPress={reiniciar} />
+                  <Botao
+                    titulo="Começar novamente"
+                    secundario
+                    onPress={reiniciar}
+                  />
                 </View>
               ) : etapa === "resultadoFilmes" ? (
                 <View style={styles.blocoResultado}>
                   {carregandoFilmes ? (
-                    <View style={styles.carregando}>
-                      <ActivityIndicator size="large" />
-
-                      <Text style={modoEscuro && styles.textoEscuro}>
-                        Procurando filmes...
-                      </Text>
-                    </View>
+                    <Carregando texto="Procurando filmes..." grande />
                   ) : (
                     <ResultadoFilmes
                       filmes={filmes}
@@ -2247,11 +2171,9 @@ export default function Index() {
                   )}
 
                   {erroFilmes !== "" && (
-                    <Text
-                      style={[styles.erro, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto accessibilityRole="alert" style={estiloErro}>
                       {erroFilmes}
-                    </Text>
+                    </Texto>
                   )}
 
                   {erroFilmes !== "" &&
@@ -2260,7 +2182,11 @@ export default function Index() {
 
                   <View style={styles.espacoGrande} />
 
-                  <Button title="Começar novamente" onPress={reiniciar} />
+                  <Botao
+                    titulo="Começar novamente"
+                    secundario
+                    onPress={reiniciar}
+                  />
                 </View>
               ) : etapa === "resultadoJogos" ? (
                 <View style={styles.blocoResultado}>
@@ -2271,28 +2197,24 @@ export default function Index() {
                   />
 
                   {jogosSemFiltro && (
-                    <Text
-                      style={[styles.aviso, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto style={styles.aviso}>
                       Nenhum jogo combinou com tudo, então estas são as opções
                       mais próximas.
-                    </Text>
+                    </Texto>
                   )}
 
                   <View style={styles.espacoGrande} />
 
-                  <Button title="Começar novamente" onPress={reiniciar} />
+                  <Botao
+                    titulo="Começar novamente"
+                    secundario
+                    onPress={reiniciar}
+                  />
                 </View>
               ) : etapa === "resultadoEventos" ? (
                 <View style={styles.blocoResultado}>
                   {carregandoEventos ? (
-                    <View style={styles.carregando}>
-                      <ActivityIndicator size="large" />
-
-                      <Text style={modoEscuro && styles.textoEscuro}>
-                        Procurando eventos...
-                      </Text>
-                    </View>
+                    <Carregando texto="Procurando eventos..." grande />
                   ) : (
                     <ResultadoEventos
                       eventos={eventos}
@@ -2302,11 +2224,9 @@ export default function Index() {
                   )}
 
                   {erroApi !== "" && (
-                    <Text
-                      style={[styles.erro, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto accessibilityRole="alert" style={estiloErro}>
                       {erroApi}
-                    </Text>
+                    </Texto>
                   )}
 
                   {erroApi !== "" &&
@@ -2315,180 +2235,105 @@ export default function Index() {
 
                   <View style={styles.espacoGrande} />
 
-                  <Button title="Começar novamente" onPress={reiniciar} />
+                  <Botao
+                    titulo="Começar novamente"
+                    secundario
+                    onPress={reiniciar}
+                  />
                 </View>
               ) : (
                 <View style={styles.blocoResultado}>
-                  <Text
-                    style={[styles.titulo, modoEscuro && styles.textoEscuro]}
-                  >
+                  <Texto cabecalho style={styles.titulo}>
                     {tituloBusca}
-                  </Text>
+                  </Texto>
 
-                  <Text
-                    style={[styles.descricao, modoEscuro && styles.textoEscuro]}
-                  >
-                    {descricaoBusca}
-                  </Text>
+                  <Texto style={styles.descricao}>{descricaoBusca}</Texto>
 
                   {atividadeEscolhida && (
-                    <View
-                      style={[styles.card, modoEscuro && styles.cardEscuro]}
-                    >
-                      <Text
-                        style={[
-                          styles.cardTitulo,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                    <View style={estiloCard}>
+                      <Texto cabecalho style={styles.cardTitulo}>
                         Atividade escolhida
-                      </Text>
+                      </Texto>
 
-                      <Text
-                        style={[
-                          styles.textoCard,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                      <Texto style={styles.textoCard}>
                         {atividadeEscolhida.nome}
-                      </Text>
+                      </Texto>
 
                       {modalidadeEscolhida && (
                         <>
-                          <Text
-                            style={[
-                              styles.cardTitulo,
-                              modoEscuro && styles.textoEscuro,
-                            ]}
-                          >
+                          <Texto cabecalho style={styles.cardTitulo}>
                             Forma escolhida
-                          </Text>
+                          </Texto>
 
-                          <Text
-                            style={[
-                              styles.textoCard,
-                              modoEscuro && styles.textoEscuro,
-                            ]}
-                          >
+                          <Texto style={styles.textoCard}>
                             {modalidadeEscolhida.nome}
-                          </Text>
+                          </Texto>
                         </>
                       )}
                     </View>
                   )}
 
                   {carregandoLocalizacao && (
-                    <View style={styles.carregando}>
-                      <ActivityIndicator size="large" />
-
-                      <Text style={modoEscuro && styles.textoEscuro}>
-                        Descobrindo onde vocês estão...
-                      </Text>
-                    </View>
+                    <Carregando
+                      texto="Descobrindo onde vocês estão..."
+                      grande
+                    />
                   )}
 
                   {latitude !== null && longitude !== null && (
-                    <View
-                      style={[styles.card, modoEscuro && styles.cardEscuro]}
-                    >
-                      <Text
-                        style={[
-                          styles.cardTitulo,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                    <View style={estiloCard}>
+                      <Texto cabecalho style={styles.cardTitulo}>
                         Localização encontrada
-                      </Text>
+                      </Texto>
 
-                      <Text
-                        style={[
-                          styles.textoCard,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                      <Texto style={styles.textoCard}>
                         Latitude: {latitude.toFixed(6)}
-                      </Text>
+                      </Texto>
 
-                      <Text
-                        style={[
-                          styles.textoCard,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                      <Texto style={styles.textoCard}>
                         Longitude: {longitude.toFixed(6)}
-                      </Text>
+                      </Texto>
 
                       {precisao !== null && (
-                        <Text
-                          style={[
-                            styles.textoCard,
-                            modoEscuro && styles.textoEscuro,
-                          ]}
-                        >
+                        <Texto style={styles.textoCard}>
                           Precisão aproximada: {Math.round(precisao)} metros
-                        </Text>
+                        </Texto>
                       )}
                     </View>
                   )}
 
                   {clima && (
-                    <View
-                      style={[styles.card, modoEscuro && styles.cardEscuro]}
-                    >
-                      <Text
-                        style={[
-                          styles.cardTitulo,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                    <View style={estiloCard}>
+                      <Texto cabecalho style={styles.cardTitulo}>
                         Clima atual
-                      </Text>
+                      </Texto>
 
-                      <Text
-                        style={[
-                          styles.textoCard,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                      <Texto style={styles.textoCard}>
                         Temperatura: {clima.temperatura} °C
-                      </Text>
+                      </Texto>
 
-                      <Text
-                        style={[
-                          styles.textoCard,
-                          modoEscuro && styles.textoEscuro,
-                        ]}
-                      >
+                      <Texto style={styles.textoCard}>
                         Precipitação: {clima.chuva} mm
-                      </Text>
+                      </Texto>
 
                       {!climaPermiteAtividade() && (
-                        <Text
-                          style={[
-                            styles.aviso,
-                            modoEscuro && styles.textoEscuro,
-                          ]}
-                        >
+                        <Texto style={styles.aviso}>
                           O clima não parece muito interessado nessa atividade.
-                        </Text>
+                        </Texto>
                       )}
                     </View>
                   )}
 
                   {erroClima !== "" && (
-                    <Text
-                      style={[styles.erro, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto accessibilityRole="alert" style={estiloErro}>
                       {erroClima}
-                    </Text>
+                    </Texto>
                   )}
 
                   {erroApi !== "" && (
-                    <Text
-                      style={[styles.erro, modoEscuro && styles.textoEscuro]}
-                    >
+                    <Texto accessibilityRole="alert" style={estiloErro}>
                       {erroApi}
-                    </Text>
+                    </Texto>
                   )}
 
                   {erroApi !== "" &&
@@ -2496,13 +2341,7 @@ export default function Index() {
                     renderAcoesDeErro(buscarLocalizacao)}
 
                   {carregandoLocais && (
-                    <View style={styles.carregando}>
-                      <ActivityIndicator />
-
-                      <Text style={modoEscuro && styles.textoEscuro}>
-                        Procurando opções próximas...
-                      </Text>
-                    </View>
+                    <Carregando texto="Procurando opções próximas..." />
                   )}
 
                   {locais.length > 0 && (
@@ -2521,13 +2360,7 @@ export default function Index() {
                   {atividadeEscolhida?.id === "cinema" && (
                     <View style={styles.blocoResultado}>
                       {carregandoFilmes ? (
-                        <View style={styles.carregando}>
-                          <ActivityIndicator />
-
-                          <Text style={modoEscuro && styles.textoEscuro}>
-                            Procurando filmes...
-                          </Text>
-                        </View>
+                        <Carregando texto="Procurando filmes..." />
                       ) : (
                         <ResultadoFilmes
                           filmes={filmes}
@@ -2538,21 +2371,20 @@ export default function Index() {
                       )}
 
                       {erroFilmes !== "" && (
-                        <Text
-                          style={[
-                            styles.erro,
-                            modoEscuro && styles.textoEscuro,
-                          ]}
-                        >
+                        <Texto accessibilityRole="alert" style={estiloErro}>
                           {erroFilmes}
-                        </Text>
+                        </Texto>
                       )}
                     </View>
                   )}
 
                   <View style={styles.espacoGrande} />
 
-                  <Button title="Começar novamente" onPress={reiniciar} />
+                  <Botao
+                    titulo="Começar novamente"
+                    secundario
+                    onPress={reiniciar}
+                  />
                 </View>
               )}
             </View>
@@ -2577,14 +2409,6 @@ const styles = StyleSheet.create({
 
   containerResultado: {
     justifyContent: "flex-start",
-  },
-
-  containerClaro: {
-    backgroundColor: "#ffffff",
-  },
-
-  containerEscuro: {
-    backgroundColor: "#121212",
   },
 
   conteudoPrincipal: {
@@ -2661,10 +2485,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
 
-  textoEscuro: {
-    color: "#ffffff",
-  },
-
   textoInvisivel: {
     color: "transparent",
   },
@@ -2710,16 +2530,10 @@ const styles = StyleSheet.create({
   input: {
     width: "100%",
     borderWidth: 1,
-    borderColor: "#999999",
     borderRadius: 8,
     padding: 12,
     marginBottom: 15,
-    fontSize: 18,
-  },
-
-  inputEscuro: {
-    color: "#ffffff",
-    borderColor: "#666666",
+    minHeight: 48,
   },
 
   lista: {
@@ -2743,14 +2557,9 @@ const styles = StyleSheet.create({
 
   resposta: {
     borderWidth: 1,
-    borderColor: "#999999",
     borderRadius: 10,
     padding: 14,
     marginBottom: 10,
-  },
-
-  respostaEscuro: {
-    borderColor: "#666666",
   },
 
   nomeResposta: {
@@ -2765,23 +2574,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  botaoTema: {
-    position: "absolute",
-    bottom: 25,
-    right: 25,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#eeeeee",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 10,
-  },
-
-  iconeTema: {
-    fontSize: 26,
-  },
-
   carregando: {
     alignItems: "center",
     justifyContent: "center",
@@ -2793,14 +2585,9 @@ const styles = StyleSheet.create({
     width: "100%",
     minWidth: 0,
     borderWidth: 1,
-    borderColor: "#999999",
     borderRadius: 10,
     padding: 15,
     marginTop: 15,
-  },
-
-  cardEscuro: {
-    borderColor: "#666666",
   },
 
   cardTitulo: {
@@ -2824,14 +2611,9 @@ const styles = StyleSheet.create({
     width: "100%",
     minWidth: 0,
     borderWidth: 2,
-    borderColor: "#333333",
     borderRadius: 12,
     padding: 20,
     marginBottom: 20,
-  },
-
-  resultadoCardEscuro: {
-    borderColor: "#ffffff",
   },
 
   resultadoTitulo: {
