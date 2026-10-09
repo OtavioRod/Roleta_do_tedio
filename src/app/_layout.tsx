@@ -1,18 +1,45 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+import { View } from "react-native";
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import PainelAcessibilidade from "@/components/PainelAcessibilidade";
+import VLibrasWidget from "@/components/VLibrasWidget";
+import {
+  PreferenciasProvider,
+  usePreferencias,
+} from "@/context/PreferenciasContext";
+import { acordarBackend } from "@/services/acordarBackend";
 
 SplashScreen.preventAutoHideAsync();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+function Conteudo() {
+  const { tema, cores } = usePreferencias();
+
+  useEffect(() => {
+    acordarBackend();
+  }, []);
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={tema === "escuro" ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
-      <AppTabs />
+
+      <View style={{ flex: 1, backgroundColor: cores.fundo }}>
+        <Slot />
+
+        <PainelAcessibilidade />
+      </View>
+
+      <VLibrasWidget />
     </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <PreferenciasProvider>
+      <Conteudo />
+    </PreferenciasProvider>
   );
 }
