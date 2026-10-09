@@ -1,15 +1,15 @@
 import * as Location from "expo-location";
-import { useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  FlatList,
   KeyboardAvoidingView,
   Linking,
   Platform,
   ScrollView,
   StyleProp,
   StyleSheet,
+  Text,
   TextInput,
   TextStyle,
   View,
@@ -44,7 +44,7 @@ import { buscarReceitas, Receita } from "../services/receitas";
 const VELOCIDADE_DIGITACAO = 18;
 
 const TEMPO_LIMITE_PADRAO = 15000;
-const TEMPO_LIMITE_LOCAIS = 30000;
+const TEMPO_LIMITE_LOCAIS = 120000;
 const TEMPO_LIMITE_POSICAO = 20000;
 
 const DURACAO_CACHE_LOCAIS = 10 * 60 * 1000;
@@ -194,6 +194,25 @@ const TITULO_LOCAIS: Record<string, string> = {
   restaurante: "Restaurantes próximos",
 };
 
+const ANUNCIO_ETAPA: Record<Etapa, string> = {
+  sala: "Sala criada. Adicione os participantes.",
+  humor: "Pergunta: como você está agora?",
+  humorEscolhido: "Resposta registrada.",
+  gasto: "Pergunta: quanto você pretende gastar?",
+  gastoEscolhido: "Resposta registrada.",
+  disposicao: "Pergunta: qual é a sua disposição?",
+  disposicaoEscolhida: "Resposta registrada.",
+  tempo: "Pergunta: quanto tempo você tem?",
+  tempoEscolhido: "Resposta registrada.",
+  resumo: "Resumo das respostas.",
+  resultado: "A roleta decidiu.",
+  resultadoModalidade: "Resultado do café.",
+  resultadoFilmes: "Lista de filmes.",
+  resultadoJogos: "Lista de jogos.",
+  resultadoEventos: "Lista de eventos.",
+  localizacao: "Buscando opções perto de você.",
+};
+
 function avisar(mensagem: string) {
   alert(mensagem);
 }
@@ -299,6 +318,7 @@ function criarParticipante(nome: string): Participante {
 
 function useReduzirMovimento() {
   const [reduzir, setReduzir] = useState(false);
+  const [leitor, setLeitor] = useState(false);
 
   useEffect(() => {
     let ativo = true;
@@ -309,18 +329,51 @@ function useReduzirMovimento() {
           setReduzir(valor);
         }
       })
-      .catch(() => {
+      .catch(() => undefined);
+
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then((valor) => {
         if (ativo) {
-          setReduzir(false);
+          setLeitor(valor);
         }
-      });
+      })
+      .catch(() => undefined);
+
+    const assinaturaMovimento = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduzir,
+    );
+
+    const assinaturaLeitor = AccessibilityInfo.addEventListener(
+      "screenReaderChanged",
+      setLeitor,
+    );
 
     return () => {
       ativo = false;
+      assinaturaMovimento.remove();
+      assinaturaLeitor.remove();
     };
   }, []);
 
-  return reduzir;
+  return reduzir || leitor;
+}
+
+type TelaProps = {
+  children: ReactNode;
+};
+
+function Tela({ children }: TelaProps) {
+  return (
+    <ScrollView
+      style={styles.telaScroll}
+      contentContainerStyle={styles.telaConteudo}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator
+    >
+      <View style={styles.conteudoPrincipal}>{children}</View>
+    </ScrollView>
+  );
 }
 
 type TextoDigitadoProps = {
@@ -379,7 +432,7 @@ function TextoDigitado({
   return (
     <Texto style={estilo} accessibilityLabel={texto} cabecalho={cabecalho}>
       {texto.slice(0, quantidade)}
-      <Texto style={styles.textoInvisivel}>{texto.slice(quantidade)}</Texto>
+      <Text style={styles.textoInvisivel}>{texto.slice(quantidade)}</Text>
     </Texto>
   );
 }
@@ -490,7 +543,7 @@ function Carregando({ texto, grande }: CarregandoProps) {
 }
 
 export default function Index() {
-  const { cores, escala } = usePreferencias();
+  const { cores } = usePreferencias();
 
   const [iniciou, setIniciou] = useState(false);
   const [tipo, setTipo] = useState<Tipo | "">("");
@@ -552,6 +605,14 @@ export default function Index() {
   const [permissaoNegada, setPermissaoNegada] = useState(false);
 
   const execucaoId = useRef(0);
+
+  useEffect(() => {
+    if (!iniciou || !salaCriada) {
+      return;
+    }
+
+    AccessibilityInfo.announceForAccessibility?.(ANUNCIO_ETAPA[etapa]);
+  }, [etapa, iniciou, salaCriada]);
 
   const estiloErro = [styles.erro, { color: cores.erro }];
 
@@ -1707,7 +1768,7 @@ export default function Index() {
         ]}
       >
         {!iniciou ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Roleta do Tédio
             </Texto>
@@ -1721,9 +1782,9 @@ export default function Index() {
             </Texto>
 
             <Botao titulo="Começar" onPress={() => setIniciou(true)} />
-          </View>
+          </Tela>
         ) : !salaCriada ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <PerguntaAnimada
               key="situacao"
               titulo="Primeiro, vamos entender a situação"
@@ -1760,9 +1821,9 @@ export default function Index() {
                 <Botao titulo="Criar sala" onPress={criarSala} />
               </View>
             )}
-          </View>
+          </Tela>
         ) : etapa === "sala" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Sala criada
             </Texto>
@@ -1804,17 +1865,15 @@ export default function Index() {
               </>
             )}
 
-            <FlatList
-              data={participantes}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
+            <View style={styles.lista}>
+              {participantes.map((participante) => (
                 <ParticipanteItem
-                  nome={item.nome}
-                  onRemover={() => removerParticipante(item.id)}
+                  key={participante.id}
+                  nome={participante.nome}
+                  onRemover={() => removerParticipante(participante.id)}
                 />
-              )}
-              style={styles.lista}
-            />
+              ))}
+            </View>
 
             {!podeContinuar() && (
               <Texto style={styles.aviso}>
@@ -1832,9 +1891,9 @@ export default function Index() {
               onPress={continuar}
               desabilitado={!podeContinuar()}
             />
-          </View>
+          </Tela>
         ) : etapa === "humor" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <PerguntaAnimada
               key={`humor-${participanteAtual}`}
               titulo={`Agora é pessoal, ${participanteDaVez?.nome ?? ""}`}
@@ -1850,9 +1909,9 @@ export default function Index() {
                 />
               </View>
             ))}
-          </View>
+          </Tela>
         ) : etapa === "humorEscolhido" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Entendido...
             </Texto>
@@ -1871,9 +1930,9 @@ export default function Index() {
             </Texto>
 
             <Botao titulo="Descobrir" onPress={() => setEtapa("gasto")} />
-          </View>
+          </Tela>
         ) : etapa === "gasto" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <PerguntaAnimada
               key={`gasto-${participanteAtual}`}
               titulo="Quanto você pretende gastar?"
@@ -1888,9 +1947,9 @@ export default function Index() {
                 />
               </View>
             ))}
-          </View>
+          </Tela>
         ) : etapa === "gastoEscolhido" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Anotado...
             </Texto>
@@ -1909,9 +1968,9 @@ export default function Index() {
             </Texto>
 
             <Botao titulo="Continuar" onPress={() => setEtapa("disposicao")} />
-          </View>
+          </Tela>
         ) : etapa === "disposicao" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <PerguntaAnimada
               key={`disposicao-${participanteAtual}`}
               titulo="Qual é a sua disposição?"
@@ -1926,9 +1985,9 @@ export default function Index() {
                 />
               </View>
             ))}
-          </View>
+          </Tela>
         ) : etapa === "disposicaoEscolhida" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Última pergunta...
             </Texto>
@@ -1949,9 +2008,9 @@ export default function Index() {
               titulo="Descobrir meu tempo"
               onPress={() => setEtapa("tempo")}
             />
-          </View>
+          </Tela>
         ) : etapa === "tempo" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <PerguntaAnimada
               key={`tempo-${participanteAtual}`}
               titulo="Quanto tempo você tem?"
@@ -1966,9 +2025,9 @@ export default function Index() {
                 />
               </View>
             ))}
-          </View>
+          </Tela>
         ) : etapa === "tempoEscolhido" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Perfeito...
             </Texto>
@@ -1992,9 +2051,9 @@ export default function Index() {
               }
               onPress={proximoParticipante}
             />
-          </View>
+          </Tela>
         ) : etapa === "resumo" ? (
-          <View style={styles.conteudoPrincipal}>
+          <Tela>
             <Texto cabecalho style={styles.titulo}>
               Então é isso...
             </Texto>
@@ -2003,32 +2062,29 @@ export default function Index() {
               A roleta já sabe demais sobre vocês.
             </Texto>
 
-            <FlatList
-              data={participantes}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={estiloResposta}>
-                  <Texto style={styles.nomeResposta}>{item.nome}</Texto>
+            <View style={styles.lista}>
+              {participantes.map((participante) => (
+                <View key={participante.id} style={estiloResposta}>
+                  <Texto style={styles.nomeResposta}>{participante.nome}</Texto>
 
                   <Texto style={styles.textoResposta}>
-                    Humor: {rotuloHumor(item.humor)}
+                    Humor: {rotuloHumor(participante.humor)}
                   </Texto>
 
                   <Texto style={styles.textoResposta}>
-                    Gasto: {rotuloGasto(item.gasto)}
+                    Gasto: {rotuloGasto(participante.gasto)}
                   </Texto>
 
                   <Texto style={styles.textoResposta}>
-                    Disposição: {rotuloDisposicao(item.disposicao)}
+                    Disposição: {rotuloDisposicao(participante.disposicao)}
                   </Texto>
 
                   <Texto style={styles.textoResposta}>
-                    Tempo: {item.tempo}
+                    Tempo: {participante.tempo}
                   </Texto>
                 </View>
-              )}
-              style={styles.lista}
-            />
+              ))}
+            </View>
 
             <Texto style={styles.descricao}>
               Tudo registrado. Agora vocês não podem mais dizer que a roleta não
@@ -2040,7 +2096,7 @@ export default function Index() {
               onPress={escolherAtividade}
               dica="Sorteia uma atividade com base nas respostas de todos"
             />
-          </View>
+          </Tela>
         ) : telaDeResultado ? (
           <ScrollView
             style={styles.resultadoScroll}
@@ -2354,6 +2410,7 @@ export default function Index() {
                       latitude={latitude ?? 0}
                       longitude={longitude ?? 0}
                       mostrarMapa
+                      minutosDisponiveis={menorTempoDisponivel()}
                     />
                   )}
 
@@ -2375,6 +2432,10 @@ export default function Index() {
                           {erroFilmes}
                         </Texto>
                       )}
+
+                      {erroFilmes !== "" &&
+                        !carregandoFilmes &&
+                        renderAcoesDeErro(buscarFilmesResultado)}
                     </View>
                   )}
 
@@ -2409,6 +2470,18 @@ const styles = StyleSheet.create({
 
   containerResultado: {
     justifyContent: "flex-start",
+  },
+
+  telaScroll: {
+    flex: 1,
+    width: "100%",
+  },
+
+  telaConteudo: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingTop: 24,
+    paddingBottom: 100,
   },
 
   conteudoPrincipal: {
@@ -2537,7 +2610,6 @@ const styles = StyleSheet.create({
   },
 
   lista: {
-    maxHeight: 200,
     marginTop: 15,
     marginBottom: 15,
   },

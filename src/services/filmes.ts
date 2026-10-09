@@ -8,33 +8,6 @@ export type Filme = {
   categoria?: string;
 };
 
-type RespostaFilme = {
-  id?: number | string;
-  title?: string;
-  original_title?: string;
-  year?: number;
-  release_year?: number;
-  released?: string;
-  release_date?: string;
-  overview?: string;
-  synopsis?: string;
-  description?: string;
-  fused_rating?: number;
-  rating?: number;
-  vote_average?: number;
-  type?: string;
-  media_type?: string;
-  genres?: string[] | string;
-  genre_names?: string[];
-};
-
-type RespostaBusca = {
-  results?: RespostaFilme[];
-  data?: RespostaFilme[];
-  items?: RespostaFilme[];
-  media?: RespostaFilme[];
-};
-
 const BASE_FILMES: Filme[] = [
   {
     id: "filme-1",
@@ -218,106 +191,6 @@ const BASE_FILMES: Filme[] = [
   },
 ];
 
-function obterGenero(filme: RespostaFilme): string {
-  if (Array.isArray(filme.genres) && filme.genres.length > 0) {
-    return filme.genres.join(", ");
-  }
-
-  if (typeof filme.genres === "string" && filme.genres.trim()) {
-    return filme.genres;
-  }
-
-  if (Array.isArray(filme.genre_names) && filme.genre_names.length > 0) {
-    return filme.genre_names.join(", ");
-  }
-
-  return "Filme";
-}
-
-function obterAno(filme: RespostaFilme): number {
-  if (filme.year) {
-    return filme.year;
-  }
-
-  if (filme.release_year) {
-    return filme.release_year;
-  }
-
-  const data = filme.released ?? filme.release_date ?? "";
-
-  if (data) {
-    const ano = Number(data.substring(0, 4));
-
-    if (!Number.isNaN(ano)) {
-      return ano;
-    }
-  }
-
-  return 0;
-}
-
-function obterNota(filme: RespostaFilme): number {
-  return filme.fused_rating ?? filme.rating ?? filme.vote_average ?? 0;
-}
-
-function obterDescricao(filme: RespostaFilme): string {
-  return (
-    filme.overview ??
-    filme.synopsis ??
-    filme.description ??
-    "Sinopse não disponível."
-  );
-}
-
-function transformarFilme(filme: RespostaFilme, index: number): Filme | null {
-  const titulo = filme.title ?? filme.original_title;
-
-  if (!titulo) {
-    return null;
-  }
-
-  return {
-    id: String(filme.id ?? `${titulo}-${index}`),
-    titulo,
-    genero: obterGenero(filme),
-    ano: obterAno(filme),
-    nota: obterNota(filme),
-    descricao: obterDescricao(filme),
-  };
-}
-
-function obterResultados(dados: RespostaBusca): RespostaFilme[] {
-  if (Array.isArray(dados.results)) {
-    return dados.results;
-  }
-
-  if (Array.isArray(dados.data)) {
-    return dados.data;
-  }
-
-  if (Array.isArray(dados.items)) {
-    return dados.items;
-  }
-
-  if (Array.isArray(dados.media)) {
-    return dados.media;
-  }
-
-  return [];
-}
-
-function ehFilme(filme: RespostaFilme): boolean {
-  const tipo = filme.type ?? filme.media_type;
-
-  if (!tipo) {
-    return true;
-  }
-
-  const tipoNormalizado = tipo.toLowerCase();
-
-  return tipoNormalizado === "movie" || tipoNormalizado === "film";
-}
-
 function ordenarPorNota(filmes: Filme[]): Filme[] {
   return [...filmes].sort((a, b) => b.nota - a.nota);
 }
@@ -342,27 +215,8 @@ function buscarNaBaseLocalPorNome(nome: string): Filme[] {
   });
 }
 
-async function fazerRequisicao(url: string): Promise<RespostaBusca> {
-  const resposta = await fetch(url);
-
-  if (!resposta.ok) {
-    throw new Error(`Erro ao consultar fonte de filmes: ${resposta.status}`);
-  }
-
-  return resposta.json();
-}
-
-function transformarResultados(resultados: RespostaFilme[]): Filme[] {
-  return resultados
-    .filter(ehFilme)
-    .map(transformarFilme)
-    .filter((filme): filme is Filme => filme !== null);
-}
-
 export async function buscarFilmes(quantidade = 8): Promise<Filme[]> {
-  const filmesLocais = buscarNaBaseLocal(quantidade);
-
-  return filmesLocais;
+  return buscarNaBaseLocal(quantidade);
 }
 
 export async function buscarFilmesPorNome(nome: string): Promise<Filme[]> {

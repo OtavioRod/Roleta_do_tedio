@@ -1,5 +1,6 @@
 import { DarkTheme, DefaultTheme, Slot, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
 import { View } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
@@ -9,11 +10,16 @@ import {
   PreferenciasProvider,
   usePreferencias,
 } from "@/context/PreferenciasContext";
+import { acordarBackend } from "@/services/acordarBackend";
 
 SplashScreen.preventAutoHideAsync();
 
 function Conteudo() {
   const { tema, cores } = usePreferencias();
+
+  useEffect(() => {
+    acordarBackend();
+  }, []);
 
   return (
     <ThemeProvider value={tema === "escuro" ? DarkTheme : DefaultTheme}>
