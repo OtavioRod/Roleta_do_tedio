@@ -23,6 +23,10 @@
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
     "plugins": [
       "expo-router",
       [
@@ -34,11 +38,8 @@
         }
       ],
       "expo-image",
-      "expo-web-browser"
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+      "expo-web-browser",
+      "expo-notifications"
+    ]
   }
 }

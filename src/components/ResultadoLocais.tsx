@@ -9,7 +9,7 @@ import {
   EstadoHorario,
   StatusHorario,
 } from "../utils/horarioFuncionamento";
-import { urlRota } from "../utils/mapas";
+import { urlBuscaNoMapa, urlRota } from "../utils/mapas";
 import BadgeHorario from "./BadgeHorario";
 import Botao from "./Botao";
 import MapaLeaflet from "./MapaLeaflet";
@@ -198,8 +198,12 @@ export default function ResultadoLocais({
                 const distancia = formatarDistancia(local.distanciaMetros);
 
                 const site = local.website;
-
+                const instagram = local.instagram;
+                const facebook = local.facebook;
                 const telefone = local.telefone;
+                const osmUrl = local.osmUrl;
+
+                const semHorario = status.estado === "desconhecido";
 
                 return (
                   <View
@@ -220,6 +224,17 @@ export default function ResultadoLocais({
                       status={status}
                       minutosDisponiveis={minutosDisponiveis}
                     />
+
+                    {semHorario && (
+                      <Texto
+                        style={[
+                          styles.notaDados,
+                          { color: cores.textoSecundario },
+                        ]}
+                      >
+                        Horário não cadastrado no OpenStreetMap.
+                      </Texto>
+                    )}
 
                     {distancia && (
                       <Texto
@@ -270,6 +285,26 @@ export default function ResultadoLocais({
                         />
                       </View>
 
+                      {semHorario && (
+                        <View style={styles.acao}>
+                          <Botao
+                            titulo="Ver horário no Google Maps"
+                            rotulo={`Ver horário de ${local.nome} no Google Maps`}
+                            dica="Abre o Google Maps para você conferir o horário"
+                            secundario
+                            onPress={() =>
+                              abrirLink(
+                                urlBuscaNoMapa(
+                                  local.latitude,
+                                  local.longitude,
+                                  local.nome,
+                                ),
+                              )
+                            }
+                          />
+                        </View>
+                      )}
+
                       {mostrarSessoes && (
                         <View style={styles.acao}>
                           <Botao
@@ -289,6 +324,28 @@ export default function ResultadoLocais({
                             rotulo={`Abrir o site de ${local.nome}`}
                             secundario
                             onPress={() => abrirLink(site)}
+                          />
+                        </View>
+                      )}
+
+                      {instagram && (
+                        <View style={styles.acao}>
+                          <Botao
+                            titulo="Instagram"
+                            rotulo={`Abrir o Instagram de ${local.nome}`}
+                            secundario
+                            onPress={() => abrirLink(instagram)}
+                          />
+                        </View>
+                      )}
+
+                      {facebook && (
+                        <View style={styles.acao}>
+                          <Botao
+                            titulo="Facebook"
+                            rotulo={`Abrir o Facebook de ${local.nome}`}
+                            secundario
+                            onPress={() => abrirLink(facebook)}
                           />
                         </View>
                       )}
@@ -314,27 +371,42 @@ export default function ResultadoLocais({
                         styles.coordenadasContainer,
                         { borderTopColor: cores.borda },
                       ]}
-                      accessibilityElementsHidden
-                      importantForAccessibility="no-hide-descendants"
                     >
-                      <Texto
-                        style={[
-                          styles.coordenadasLabel,
-                          { color: cores.textoSecundario },
-                        ]}
+                      <View
+                        accessibilityElementsHidden
+                        importantForAccessibility="no-hide-descendants"
                       >
-                        Coordenadas
-                      </Texto>
+                        <Texto
+                          style={[
+                            styles.coordenadasLabel,
+                            { color: cores.textoSecundario },
+                          ]}
+                        >
+                          Coordenadas
+                        </Texto>
 
-                      <Texto
-                        style={[
-                          styles.coordenadas,
-                          { color: cores.textoSecundario },
-                        ]}
-                      >
-                        {local.latitude.toFixed(5)},{" "}
-                        {local.longitude.toFixed(5)}
-                      </Texto>
+                        <Texto
+                          style={[
+                            styles.coordenadas,
+                            { color: cores.textoSecundario },
+                          ]}
+                        >
+                          {local.latitude.toFixed(5)},{" "}
+                          {local.longitude.toFixed(5)}
+                        </Texto>
+                      </View>
+
+                      {osmUrl && (
+                        <View style={styles.linkDados}>
+                          <Botao
+                            titulo="Ver dados no OpenStreetMap"
+                            rotulo={`Ver os dados cadastrados de ${local.nome} no OpenStreetMap`}
+                            dica="Mostra todas as informações que existem sobre este lugar"
+                            secundario
+                            onPress={() => abrirLink(osmUrl)}
+                          />
+                        </View>
+                      )}
                     </View>
                   </View>
                 );
@@ -431,6 +503,15 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
+  notaDados: {
+    width: "100%",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: -6,
+    marginBottom: 10,
+    flexShrink: 1,
+  },
+
   distancia: {
     width: "100%",
     fontSize: 15,
@@ -481,6 +562,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     flexShrink: 1,
+  },
+
+  linkDados: {
+    marginTop: 10,
+    alignSelf: "flex-start",
   },
 
   mapaContainer: {

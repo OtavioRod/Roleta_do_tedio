@@ -16,6 +16,9 @@ export type Local = {
   horario?: string;
   website?: string;
   telefone?: string;
+  instagram?: string;
+  facebook?: string;
+  osmUrl?: string;
   distanciaMetros?: number;
 };
 
@@ -30,10 +33,20 @@ type TagsOverpass = {
   "addr:city"?: string;
 
   opening_hours?: string;
+
   website?: string;
   "contact:website"?: string;
+  url?: string;
+
   phone?: string;
   "contact:phone"?: string;
+  mobile?: string;
+  "contact:mobile"?: string;
+
+  instagram?: string;
+  "contact:instagram"?: string;
+  facebook?: string;
+  "contact:facebook"?: string;
 };
 
 type ElementoOverpass = {
@@ -59,6 +72,8 @@ const TEMPO_LIMITE_MS = 45000;
 const ESPERA_NOVA_TENTATIVA_MS = 3000;
 const LIMITE_RESULTADOS = 20;
 const RAIO_MAXIMO = 30000;
+const LIMITE_DUPLICADO_GRAUS = 0.0003;
+const ENDERECO_PADRAO = "Endereço não informado";
 const ERRO_TEMPO_ESGOTADO = "tempo-esgotado";
 
 class ErroHttp extends Error {
@@ -120,6 +135,34 @@ function normalizarSite(valor?: string) {
   return /^https?:\/\//i.test(texto) ? texto : `https://${texto}`;
 }
 
+function normalizarRede(valor: string | undefined, base: string) {
+  const texto = limparTexto(valor);
+
+  if (!texto) {
+    return undefined;
+  }
+
+  if (/^https?:\/\//i.test(texto)) {
+    return texto;
+  }
+
+  const usuario = texto.replace(/^@/, "").replace(/^\/+/, "");
+
+  if (usuario === "" || /\s/.test(usuario)) {
+    return undefined;
+  }
+
+  return `${base}${usuario}`;
+}
+
+function normalizarNome(nome: string) {
+  return nome
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function obterNome(elemento: ElementoOverpass): string | null {
   return (
     elemento.tags?.name ??
@@ -161,7 +204,7 @@ function obterEndereco(elemento: ElementoOverpass): string {
 
   const endereco = [rua, numero, bairro, cidade].filter(Boolean).join(", ");
 
-  return endereco || "Endereço não informado";
+  return endereco || ENDERECO_PADRAO;
 }
 
 function calcularDistancia(
@@ -208,14 +251,43 @@ function transformarElemento(
     longitude: coordenadas.longitude,
     endereco: obterEndereco(elemento),
     horario: limparTexto(tags?.opening_hours),
-    website: normalizarSite(tags?.website ?? tags?.["contact:website"]),
-    telefone: limparTexto(tags?.phone ?? tags?.["contact:phone"]),
+    website: normalizarSite(
+      tags?.website ?? tags?.["contact:website"] ?? tags?.url,
+    ),
+    telefone: limparTexto(
+      tags?.phone ??
+        tags?.["contact:phone"] ??
+        tags?.mobile ??
+        tags?.["contact:mobile"],
+    ),
+    instagram: normalizarRede(
+      tags?.instagram ?? tags?.["contact:instagram"],
+      "https://www.instagram.com/",
+    ),
+    facebook: normalizarRede(
+      tags?.facebook ?? tags?.["contact:facebook"],
+      "https://www.facebook.com/",
+    ),
+    osmUrl: `https://www.openstreetmap.org/${elemento.type}/${elemento.id}`,
     distanciaMetros: calcularDistancia(
       origemLat,
       origemLon,
       coordenadas.latitude,
       coordenadas.longitude,
     ),
+  };
+}
+
+function mesclar(base: Local, outro: Local): Local {
+  return {
+    ...base,
+    endereco:
+      base.endereco === ENDERECO_PADRAO ? outro.endereco : base.endereco,
+    horario: base.horario ?? outro.horario,
+    website: base.website ?? outro.website,
+    telefone: base.telefone ?? outro.telefone,
+    instagram: base.instagram ?? outro.instagram,
+    facebook: base.facebook ?? outro.facebook,
   };
 }
 
@@ -226,28 +298,41 @@ function processarElementos(
 ): Local[] {
   const idsVistos = new Set<string>();
 
-  const locais: Local[] = [];
+  const candidatos: Local[] = [];
 
   for (const elemento of elementos) {
     const local = transformarElemento(elemento, origemLat, origemLon);
 
     if (local && !idsVistos.has(local.id)) {
       idsVistos.add(local.id);
-      locais.push(local);
+      candidatos.push(local);
     }
   }
 
-  locais.sort((a, b) => (a.distanciaMetros ?? 0) - (b.distanciaMetros ?? 0));
-
-  return locais.filter(
-    (local, index, lista) =>
-      lista.findIndex(
-        (item) =>
-          item.nome.toLowerCase() === local.nome.toLowerCase() &&
-          Math.abs(item.latitude - local.latitude) < 0.0001 &&
-          Math.abs(item.longitude - local.longitude) < 0.0001,
-      ) === index,
+  candidatos.sort(
+    (a, b) => (a.distanciaMetros ?? 0) - (b.distanciaMetros ?? 0),
   );
+
+  const unicos: Local[] = [];
+
+  for (const candidato of candidatos) {
+    const nomeCandidato = normalizarNome(candidato.nome);
+
+    const indice = unicos.findIndex(
+      (item) =>
+        normalizarNome(item.nome) === nomeCandidato &&
+        Math.abs(item.latitude - candidato.latitude) < LIMITE_DUPLICADO_GRAUS &&
+        Math.abs(item.longitude - candidato.longitude) < LIMITE_DUPLICADO_GRAUS,
+    );
+
+    if (indice >= 0) {
+      unicos[indice] = mesclar(unicos[indice], candidato);
+    } else {
+      unicos.push(candidato);
+    }
+  }
+
+  return unicos;
 }
 
 function montarRaios(raio: number) {
@@ -324,6 +409,8 @@ export async function buscarLocais(
 
   let locais: Local[] = [];
 
+  let consultaConcluida = false;
+
   for (let indice = 0; indice < raios.length; indice += 1) {
     try {
       const dados = await consultarBackend({
@@ -334,11 +421,19 @@ export async function buscarLocais(
         filtros,
       });
 
+      consultaConcluida = true;
+
       locais = processarElementos(dados.elements, latitude, longitude);
 
       if (__DEV__) {
+        const comHorario = locais.filter((local) => local.horario).length;
+
+        const comSite = locais.filter(
+          (local) => local.website || local.instagram || local.facebook,
+        ).length;
+
         console.log(
-          `[locais] ${tipo}: ${locais.length} resultados no raio de ${raios[indice]} m`,
+          `[locais] ${tipo}: ${locais.length} lugares · ${comHorario} com horário · ${comSite} com site ou rede social (raio de ${raios[indice]} m)`,
         );
       }
 
@@ -346,13 +441,20 @@ export async function buscarLocais(
         break;
       }
     } catch (erro) {
-      if (indice > 0 && locais.length > 0) {
-        break;
+      if (!consultaConcluida) {
+        console.warn("Falha na busca de locais:", erro);
+
+        throw erro;
       }
 
-      console.error("Erro na busca de locais:", erro);
+      if (__DEV__) {
+        console.warn(
+          `[locais] ${tipo}: a busca com raio de ${raios[indice]} m falhou; usando o resultado anterior.`,
+          erro,
+        );
+      }
 
-      throw erro;
+      break;
     }
   }
 

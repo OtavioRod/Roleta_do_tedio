@@ -14,6 +14,10 @@ export function urlRota(lat: number, lon: number, nome: string) {
   return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
 }
 
+export function urlRotaGoogle(lat: number, lon: number) {
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+}
+
 export function urlBuscaNoMapa(lat: number, lon: number, nome: string) {
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nome)}%20${lat},${lon}`;
+  return `https://www.google.com/maps/search/${encodeURIComponent(nome)}/@${lat},${lon},17z`;
 }
