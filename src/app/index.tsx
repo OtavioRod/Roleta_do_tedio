@@ -3,6 +3,7 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  BackHandler,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -14,6 +15,7 @@ import {
   TextStyle,
   View,
 } from "react-native";
+import { useSessao } from "../context/SessaoContext";
 
 import Botao from "../components/Botao";
 import ParticipanteItem from "../components/ParticipanteItem";
@@ -321,6 +323,26 @@ function useReduzirMovimento() {
   const [leitor, setLeitor] = useState(false);
 
   useEffect(() => {
+    if (Platform.OS === "web") {
+      if (typeof window === "undefined" || !window.matchMedia) {
+        return undefined;
+      }
+
+      const consulta = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+      setReduzir(consulta.matches);
+
+      const aoMudar = (evento: MediaQueryListEvent) => {
+        setReduzir(evento.matches);
+      };
+
+      consulta.addEventListener("change", aoMudar);
+
+      return () => {
+        consulta.removeEventListener("change", aoMudar);
+      };
+    }
+
     let ativo = true;
 
     AccessibilityInfo.isReduceMotionEnabled()
@@ -373,6 +395,24 @@ function Tela({ children }: TelaProps) {
     >
       <View style={styles.conteudoPrincipal}>{children}</View>
     </ScrollView>
+  );
+}
+
+type BotaoVoltarProps = {
+  aoPressionar: () => void;
+};
+
+function BotaoVoltar({ aoPressionar }: BotaoVoltarProps) {
+  return (
+    <View style={styles.botaoVoltar}>
+      <Botao
+        titulo="← Voltar"
+        rotulo="Voltar para a tela anterior"
+        dica="Desfaz a última escolha e volta uma tela"
+        secundario
+        onPress={aoPressionar}
+      />
+    </View>
   );
 }
 
@@ -544,7 +584,7 @@ function Carregando({ texto, grande }: CarregandoProps) {
 
 export default function Index() {
   const { cores } = usePreferencias();
-
+  const { executarSemExpirar } = useSessao();
   const [iniciou, setIniciou] = useState(false);
   const [tipo, setTipo] = useState<Tipo | "">("");
   const [salaCriada, setSalaCriada] = useState(false);
@@ -606,6 +646,8 @@ export default function Index() {
 
   const execucaoId = useRef(0);
 
+  const acaoVoltarRef = useRef<(() => void) | null>(null);
+
   useEffect(() => {
     if (!iniciou || !salaCriada) {
       return;
@@ -613,6 +655,28 @@ export default function Index() {
 
     AccessibilityInfo.announceForAccessibility?.(ANUNCIO_ETAPA[etapa]);
   }, [etapa, iniciou, salaCriada]);
+
+  useEffect(() => {
+    if (Platform.OS !== "android") {
+      return undefined;
+    }
+
+    const assinatura = BackHandler.addEventListener("hardwareBackPress", () => {
+      const acao = acaoVoltarRef.current;
+
+      if (acao) {
+        acao();
+
+        return true;
+      }
+
+      return false;
+    });
+
+    return () => {
+      assinatura.remove();
+    };
+  }, []);
 
   const estiloErro = [styles.erro, { color: cores.erro }];
 
@@ -891,7 +955,9 @@ export default function Index() {
       try {
         await salvarSessao(nomeAtividade, tipoSala);
       } catch (erro) {
-        console.error("Não foi possível salvar a sessão:", erro);
+        if (__DEV__) {
+          console.warn("Não foi possível salvar a sessão:", erro);
+        }
       }
     })();
   }
@@ -1474,7 +1540,9 @@ export default function Index() {
       setErroClima("");
       setPermissaoNegada(false);
 
-      const permissao = await Location.requestForegroundPermissionsAsync();
+      const permissao = await executarSemExpirar(() =>
+        Location.requestForegroundPermissionsAsync(),
+      );
 
       if (cancelado()) {
         return;
@@ -1667,6 +1735,100 @@ export default function Index() {
     }
   }
 
+  function cancelarBuscas() {
+    execucaoId.current += 1;
+
+    setCarregandoLocalizacao(false);
+    setCarregandoLocais(false);
+    setCarregandoFilmes(false);
+    setCarregandoEventos(false);
+    setCarregandoReceitas(false);
+    setErroApi("");
+    setErroClima("");
+    setErroFilmes("");
+    setPermissaoNegada(false);
+  }
+
+  function voltarParaTipo() {
+    setTipo("");
+    setNomeParticipante("");
+  }
+
+  function voltarParaNome() {
+    setNomeParticipante(participantes[0]?.nome ?? "");
+    setParticipantes([]);
+    setCodigoSala("");
+    setSalaCriada(false);
+  }
+
+  function voltarDoHumor() {
+    if (participanteAtual === 0) {
+      setEtapa("sala");
+      return;
+    }
+
+    setParticipanteAtual(participanteAtual - 1);
+    setEtapa("tempo");
+  }
+
+  function voltarDoResumo() {
+    setParticipanteAtual(Math.max(participantes.length - 1, 0));
+    setEtapa("tempo");
+  }
+
+  function voltarParaResultado() {
+    cancelarBuscas();
+    setEtapa("resultado");
+  }
+
+  function obterAcaoVoltar(): (() => void) | null {
+    if (!iniciou) {
+      return null;
+    }
+
+    if (!salaCriada) {
+      return tipo === "" ? () => setIniciou(false) : voltarParaTipo;
+    }
+
+    switch (etapa) {
+      case "sala":
+        return voltarParaNome;
+
+      case "humor":
+        return voltarDoHumor;
+
+      case "humorEscolhido":
+        return () => setEtapa("humor");
+
+      case "gasto":
+        return () => setEtapa("humor");
+
+      case "gastoEscolhido":
+        return () => setEtapa("gasto");
+
+      case "disposicao":
+        return () => setEtapa("gasto");
+
+      case "disposicaoEscolhida":
+        return () => setEtapa("disposicao");
+
+      case "tempo":
+        return () => setEtapa("disposicao");
+
+      case "tempoEscolhido":
+        return () => setEtapa("tempo");
+
+      case "resumo":
+        return voltarDoResumo;
+
+      case "resultado":
+        return () => setEtapa("resumo");
+
+      default:
+        return voltarParaResultado;
+    }
+  }
+
   function reiniciar() {
     execucaoId.current += 1;
 
@@ -1729,6 +1891,10 @@ export default function Index() {
     );
   }
 
+  const aoVoltar = obterAcaoVoltar();
+
+  acaoVoltarRef.current = aoVoltar;
+
   const participanteDaVez = participantes[participanteAtual];
 
   const telaDeResultado =
@@ -1755,6 +1921,8 @@ export default function Index() {
   const limiteParticipantes =
     tipo === "sozinho" ? 1 : tipo === "casal" ? 2 : 10;
 
+  const emTelaDeResultado = salaCriada && telaDeResultado;
+
   return (
     <KeyboardAvoidingView
       style={styles.raiz}
@@ -1764,11 +1932,22 @@ export default function Index() {
         style={[
           styles.container,
           { backgroundColor: cores.fundo },
-          telaDeResultado && styles.containerResultado,
+          emTelaDeResultado && styles.containerResultado,
         ]}
       >
+        {aoVoltar && (
+          <View
+            style={[
+              styles.cabecalhoVoltar,
+              emTelaDeResultado && styles.cabecalhoVoltarLargo,
+            ]}
+          >
+            <BotaoVoltar aoPressionar={aoVoltar} />
+          </View>
+        )}
+
         {!iniciou ? (
-          <Tela>
+          <Tela key="inicio">
             <Texto cabecalho style={styles.titulo}>
               Roleta do Tédio
             </Texto>
@@ -1784,7 +1963,7 @@ export default function Index() {
             <Botao titulo="Começar" onPress={() => setIniciou(true)} />
           </Tela>
         ) : !salaCriada ? (
-          <Tela>
+          <Tela key="entrada">
             <PerguntaAnimada
               key="situacao"
               titulo="Primeiro, vamos entender a situação"
@@ -1823,7 +2002,7 @@ export default function Index() {
             )}
           </Tela>
         ) : etapa === "sala" ? (
-          <Tela>
+          <Tela key="sala">
             <Texto cabecalho style={styles.titulo}>
               Sala criada
             </Texto>
@@ -1893,7 +2072,7 @@ export default function Index() {
             />
           </Tela>
         ) : etapa === "humor" ? (
-          <Tela>
+          <Tela key="humor">
             <PerguntaAnimada
               key={`humor-${participanteAtual}`}
               titulo={`Agora é pessoal, ${participanteDaVez?.nome ?? ""}`}
@@ -1911,7 +2090,7 @@ export default function Index() {
             ))}
           </Tela>
         ) : etapa === "humorEscolhido" ? (
-          <Tela>
+          <Tela key="humorEscolhido">
             <Texto cabecalho style={styles.titulo}>
               Entendido...
             </Texto>
@@ -1932,7 +2111,7 @@ export default function Index() {
             <Botao titulo="Descobrir" onPress={() => setEtapa("gasto")} />
           </Tela>
         ) : etapa === "gasto" ? (
-          <Tela>
+          <Tela key="gasto">
             <PerguntaAnimada
               key={`gasto-${participanteAtual}`}
               titulo="Quanto você pretende gastar?"
@@ -1949,7 +2128,7 @@ export default function Index() {
             ))}
           </Tela>
         ) : etapa === "gastoEscolhido" ? (
-          <Tela>
+          <Tela key="gastoEscolhido">
             <Texto cabecalho style={styles.titulo}>
               Anotado...
             </Texto>
@@ -1970,7 +2149,7 @@ export default function Index() {
             <Botao titulo="Continuar" onPress={() => setEtapa("disposicao")} />
           </Tela>
         ) : etapa === "disposicao" ? (
-          <Tela>
+          <Tela key="disposicao">
             <PerguntaAnimada
               key={`disposicao-${participanteAtual}`}
               titulo="Qual é a sua disposição?"
@@ -1987,7 +2166,7 @@ export default function Index() {
             ))}
           </Tela>
         ) : etapa === "disposicaoEscolhida" ? (
-          <Tela>
+          <Tela key="disposicaoEscolhida">
             <Texto cabecalho style={styles.titulo}>
               Última pergunta...
             </Texto>
@@ -2010,7 +2189,7 @@ export default function Index() {
             />
           </Tela>
         ) : etapa === "tempo" ? (
-          <Tela>
+          <Tela key="tempo">
             <PerguntaAnimada
               key={`tempo-${participanteAtual}`}
               titulo="Quanto tempo você tem?"
@@ -2027,7 +2206,7 @@ export default function Index() {
             ))}
           </Tela>
         ) : etapa === "tempoEscolhido" ? (
-          <Tela>
+          <Tela key="tempoEscolhido">
             <Texto cabecalho style={styles.titulo}>
               Perfeito...
             </Texto>
@@ -2053,7 +2232,7 @@ export default function Index() {
             />
           </Tela>
         ) : etapa === "resumo" ? (
-          <Tela>
+          <Tela key="resumo">
             <Texto cabecalho style={styles.titulo}>
               Então é isso...
             </Texto>
@@ -2470,6 +2649,24 @@ const styles = StyleSheet.create({
 
   containerResultado: {
     justifyContent: "flex-start",
+  },
+
+  cabecalhoVoltar: {
+    width: "100%",
+    maxWidth: 700,
+    alignSelf: "center",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+
+  cabecalhoVoltarLargo: {
+    maxWidth: 1000,
+  },
+
+  botaoVoltar: {
+    alignSelf: "flex-start",
+    minWidth: 120,
   },
 
   telaScroll: {

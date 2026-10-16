@@ -1,13 +1,12 @@
-import { Platform, StyleSheet, Text, View } from "react-native";
-import { WebView } from "react-native-webview";
+import { useMemo } from "react";
+import { Linking, Platform, StyleSheet, View } from "react-native";
+import { WebView, WebViewMessageEvent } from "react-native-webview";
 
-type Local = {
-  id: string;
-  nome: string;
-  latitude: number;
-  longitude: number;
-  endereco: string;
-};
+import { usePreferencias } from "../context/PreferenciasContext";
+import { Local } from "../services/overpass";
+import { montarHtmlMapa } from "../utils/htmlMapa";
+import { montarMarcadores } from "../utils/marcadoresMapa";
+import Texto from "./Texto";
 
 type Props = {
   latitude: number;
@@ -15,109 +14,47 @@ type Props = {
   locais: Local[];
 };
 
+const PREFIXOS_PERMITIDOS = [
+  "https://www.google.com/maps/",
+  "https://www.openstreetmap.org/",
+];
+
+async function abrirSeguro(url: string) {
+  if (!PREFIXOS_PERMITIDOS.some((prefixo) => url.startsWith(prefixo))) {
+    return;
+  }
+
+  try {
+    await Linking.openURL(url);
+  } catch (erro) {
+    console.error("Não foi possível abrir o link do mapa:", erro);
+  }
+}
+
 export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
-  const marcadores = [
-    {
-      id: "usuario",
-      nome: "Sua localização",
-      latitude,
-      longitude,
-      endereco: "Localização atual",
-    },
-    ...locais,
-  ];
+  const { escala } = usePreferencias();
 
-  const html = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
-        />
+  const html = useMemo(
+    () =>
+      montarHtmlMapa(
+        latitude,
+        longitude,
+        montarMarcadores(latitude, longitude, locais),
+        escala,
+      ),
+    [latitude, longitude, locais, escala],
+  );
 
-        <link
-          rel="stylesheet"
-          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        />
-
-        <style>
-          html,
-          body,
-          #map {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-          }
-
-          body {
-            overflow: hidden;
-          }
-        </style>
-      </head>
-
-      <body>
-        <div id="map"></div>
-
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-        <script>
-          const latitude = ${latitude};
-          const longitude = ${longitude};
-
-          const locais = ${JSON.stringify(marcadores)};
-
-          const map = L.map("map").setView(
-            [latitude, longitude],
-            14
-          );
-
-          L.tileLayer(
-            "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            {
-              maxZoom: 19,
-              attribution: "&copy; OpenStreetMap contributors"
-            }
-          ).addTo(map);
-
-          locais.forEach((local) => {
-            const marcador = L.marker([
-              local.latitude,
-              local.longitude
-            ]).addTo(map);
-
-            marcador.bindPopup(
-              "<strong>" +
-              local.nome +
-              "</strong><br>" +
-              local.endereco
-            );
-          });
-
-          if (locais.length > 1) {
-            const pontos = locais.map((local) => [
-              local.latitude,
-              local.longitude
-            ]);
-
-            const limites = L.latLngBounds(pontos);
-
-            map.fitBounds(limites, {
-              padding: [30, 30]
-            });
-          }
-        </script>
-      </body>
-    </html>
-  `;
+  function aoReceberMensagem(evento: WebViewMessageEvent) {
+    abrirSeguro(evento.nativeEvent.data);
+  }
 
   if (Platform.OS === "web") {
     return (
       <View style={styles.container}>
-        <Text style={styles.webTexto}>
+        <Texto style={styles.webTexto}>
           O mapa está disponível no aplicativo.
-        </Text>
+        </Texto>
       </View>
     );
   }
@@ -130,7 +67,10 @@ export default function MapaLeaflet({ latitude, longitude, locais }: Props) {
         javaScriptEnabled
         domStorageEnabled
         startInLoadingState
+        setSupportMultipleWindows={false}
+        onMessage={aoReceberMensagem}
         style={styles.mapa}
+        accessibilityLabel="Mapa com os lugares encontrados"
       />
     </View>
   );
@@ -150,9 +90,7 @@ const styles = StyleSheet.create({
 
   webTexto: {
     flex: 1,
-    justifyContent: "center",
     textAlign: "center",
-    textAlignVertical: "center",
     padding: 20,
     fontSize: 16,
   },
