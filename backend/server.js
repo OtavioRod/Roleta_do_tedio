@@ -6,6 +6,10 @@ const pool = require("./db");
 
 const app = express();
 
+const DURACAO_CACHE_MS = 10 * 60 * 1000;
+const TEMPO_LIMITE_SERVIDOR_MS = 25000;
+const cacheLocais = new Map();
+
 app.use(cors());
 app.use(express.json());
 
@@ -14,7 +18,7 @@ async function consultarServidorOverpass(servidor, consulta) {
 
   const timeout = setTimeout(() => {
     controlador.abort();
-  }, 12000);
+  }, TEMPO_LIMITE_SERVIDOR_MS);
 
   try {
     console.log(`Tentando Overpass: ${servidor}`);
@@ -55,7 +59,9 @@ async function consultarServidorOverpass(servidor, consulta) {
     if (erro.name === "AbortError") {
       console.error(`Timeout ao acessar ${servidor}`);
     } else {
-      console.error(`Falha ao acessar ${servidor}:`, erro.message);
+      const causa = erro.cause ? erro.cause.code || erro.cause.message : "";
+
+      console.error(`Falha ao acessar ${servidor}:`, erro.message, causa);
     }
 
     throw erro;
@@ -71,6 +77,8 @@ async function consultarOverpass(consulta) {
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.osm.jp/api/interpreter",
+    "https://overpass.openstreetmap.fr/api/interpreter",
+    "https://overpass.osm.ch/api/interpreter",
   ];
 
   console.log("Iniciando consultas Overpass em paralelo...");
@@ -107,12 +115,22 @@ app.post("/locais", async (req, res) => {
       });
     }
 
+    const chave = `${tipo}:${latitude.toFixed(3)}:${longitude.toFixed(3)}:${raio}:${filtros.join("|")}`;
+
+    const guardado = cacheLocais.get(chave);
+
+    if (guardado && Date.now() - guardado.quando < DURACAO_CACHE_MS) {
+      console.log("Resposta vinda do cache:", chave);
+
+      return res.json(guardado.dados);
+    }
+
     const consultas = filtros
       .map((filtro) => `${filtro}(around:${raio},${latitude},${longitude});`)
       .join("\n");
 
     const consulta = `
-      [out:json][timeout:15];
+      [out:json][timeout:25];
 
       (
         ${consultas}
@@ -140,6 +158,8 @@ app.post("/locais", async (req, res) => {
 
     console.log("Elementos encontrados:", dados.elements.length);
 
+    cacheLocais.set(chave, { quando: Date.now(), dados });
+
     res.json(dados);
   } catch (error) {
     console.error("Erro na rota /locais:", error);
@@ -154,6 +174,43 @@ app.get("/", (req, res) => {
   res.json({
     mensagem: "Backend da Roleta do Tédio funcionando!",
   });
+});
+
+app.get("/teste-overpass", async (req, res) => {
+  const servidores = [
+    "https://overpass-api.de/api/status",
+    "https://overpass.private.coffee/api/status",
+    "https://overpass.kumi.systems/api/status",
+    "https://overpass.openstreetmap.fr/api/status",
+    "https://overpass.osm.ch/api/status",
+  ];
+
+  const resultados = await Promise.all(
+    servidores.map(async (endereco) => {
+      const inicio = Date.now();
+
+      try {
+        const resposta = await fetch(endereco, {
+          signal: AbortSignal.timeout(10000),
+        });
+
+        return {
+          endereco,
+          situacao: `HTTP ${resposta.status}`,
+          tempoMs: Date.now() - inicio,
+        };
+      } catch (erro) {
+        return {
+          endereco,
+          situacao: "falhou",
+          motivo: erro.cause ? erro.cause.code || erro.cause.message : erro.message,
+          tempoMs: Date.now() - inicio,
+        };
+      }
+    }),
+  );
+
+  res.json({ versaoNode: process.version, resultados });
 });
 
 app.get("/teste-banco", async (req, res) => {
@@ -225,12 +282,29 @@ app.get("/sessoes", async (req, res) => {
   }
 });
 
+async function prepararBanco() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sessoes (
+      id SERIAL PRIMARY KEY,
+      atividade TEXT NOT NULL,
+      modalidade TEXT,
+      criado_em TIMESTAMP DEFAULT NOW()
+    )
+  `);
+
+  console.log("Banco preparado: tabela sessoes pronta.");
+}
+
 if (require.main === module) {
   const PORT = process.env.PORT || 3000;
 
-  app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
-  });
+  prepararBanco()
+    .catch((erro) => console.error("Erro ao preparar o banco:", erro))
+    .finally(() => {
+      app.listen(PORT, () => {
+        console.log(`Servidor rodando na porta ${PORT}`);
+      });
+    });
 }
 
 module.exports = app;
