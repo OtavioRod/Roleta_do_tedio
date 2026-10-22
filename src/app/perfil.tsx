@@ -1,6 +1,12 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import Botao from "../components/Botao";
 import Texto from "../components/Texto";
@@ -63,22 +69,79 @@ type SecaoProps = {
 
 function Secao({ titulo, children }: SecaoProps) {
   const { cores } = usePreferencias();
+  const [expandida, setExpandida] = useState(false);
+  const [alturaConteudo, setAlturaConteudo] = useState(0);
+  const rotacao = useSharedValue(0);
+  const alturaAnimada = useSharedValue(0);
+
+  useEffect(() => {
+    const configuracao = {
+      duration: 300,
+      easing: Easing.inOut(Easing.ease),
+    };
+
+    rotacao.value = withTiming(expandida ? 90 : 0, configuracao);
+    alturaAnimada.value = withTiming(
+      expandida ? alturaConteudo : 0,
+      configuracao,
+    );
+  }, [alturaAnimada, alturaConteudo, expandida, rotacao]);
+
+  const estiloIndicador = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotacao.value}deg` }],
+  }));
+  const estiloConteudo = useAnimatedStyle(() => ({
+    height: alturaAnimada.value,
+    overflow: "hidden",
+  }));
 
   return (
-    <>
-      <Texto cabecalho style={styles.secao}>
-        {titulo}
-      </Texto>
+    <Animated.View
+      style={[
+        styles.cartao,
+        { borderColor: cores.borda, backgroundColor: cores.superficie },
+      ]}
+    >
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={titulo}
+        accessibilityState={{ expanded: expandida }}
+        onPress={() => setExpandida((atual) => !atual)}
+        style={styles.cabecalhoSecao}
+      >
+        <Texto cabecalho style={styles.secao}>
+          {titulo}
+        </Texto>
+        <Animated.Text
+          style={[
+            styles.indicador,
+            { color: cores.destaque },
+            estiloIndicador,
+          ]}
+        >
+          ›
+        </Animated.Text>
+      </Pressable>
 
-      <View
+      <Animated.View
+        accessibilityElementsHidden={!expandida}
+        importantForAccessibility={
+          expandida ? "auto" : "no-hide-descendants"
+        }
         style={[
-          styles.cartao,
-          { borderColor: cores.borda, backgroundColor: cores.superficie },
+          estiloConteudo,
+          { pointerEvents: expandida ? "auto" : "none" },
         ]}
       >
-        {children}
-      </View>
-    </>
+        <View
+          onLayout={(evento) =>
+            setAlturaConteudo(evento.nativeEvent.layout.height)
+          }
+        >
+          {children}
+        </View>
+      </Animated.View>
+    </Animated.View>
   );
 }
 
@@ -196,8 +259,8 @@ export default function Perfil() {
         </Secao>
 
         <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
-          A contagem volta ao início sempre que você toca ou digita. Se sair do
-          aplicativo, a sessão é encerrada e será preciso entrar de novo.
+          A contagem volta ao início sempre que você toca ou digita. Se ficar
+          sem interagir pelo período limite, sua sessão será encerrada.
         </Texto>
 
         <Botao titulo="Voltar ao app" onPress={() => router.replace("/")} />
@@ -232,14 +295,27 @@ const styles = StyleSheet.create({
   secao: {
     fontSize: 20,
     fontWeight: "bold",
-    marginTop: 16,
-    marginBottom: 8,
+    flex: 1,
   },
 
   cartao: {
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
+    marginTop: 16,
+  },
+
+  cabecalhoSecao: {
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+
+  indicador: {
+    fontSize: 26,
+    fontWeight: "600",
+    marginLeft: 12,
   },
 
   linha: {

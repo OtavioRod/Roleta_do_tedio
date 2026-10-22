@@ -281,6 +281,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
         if (!expirada && local) {
           if (
+            LIMITE_SEGUNDO_PLANO_MS > 0 &&
             local.saiuEm !== null &&
             agora - local.saiuEm >= LIMITE_SEGUNDO_PLANO_MS &&
             (!EXIGIR_EMAIL_VERIFICADO || usuarioAtual.emailVerified)
@@ -451,7 +452,11 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
         const agora = Date.now();
 
-        if (saida !== null && agora - saida >= LIMITE_SEGUNDO_PLANO_MS) {
+        if (
+          LIMITE_SEGUNDO_PLANO_MS > 0 &&
+          saida !== null &&
+          agora - saida >= LIMITE_SEGUNDO_PLANO_MS
+        ) {
           encerrar("segundo-plano");
           return;
         }
