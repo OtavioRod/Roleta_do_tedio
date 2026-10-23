@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../components/Botao";
@@ -17,7 +17,15 @@ export default function Entrar() {
 
   const { cores } = usePreferencias();
 
-  const { entrar, recuperarSenha, motivoEncerramento } = useSessao();
+  const {
+    entrar,
+    desbloquearComEntradaNativa,
+    recuperarSenha,
+    motivoEncerramento,
+    contaBloqueada,
+    entradaNativaDisponivel,
+    sair,
+  } = useSessao();
 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -25,6 +33,12 @@ export default function Entrar() {
   const [erroGeral, setErroGeral] = useState("");
   const [informacao, setInformacao] = useState("");
   const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    if (contaBloqueada?.email) {
+      setEmail(contaBloqueada.email);
+    }
+  }, [contaBloqueada?.uid, contaBloqueada?.email]);
 
   async function enviar() {
     if (enviando) {
@@ -46,6 +60,7 @@ export default function Entrar() {
 
     try {
       await entrar(email, senha);
+      setSenha("");
     } catch (falha) {
       setErroGeral(
         falha instanceof ErroEntradaNativa
@@ -86,6 +101,27 @@ export default function Entrar() {
     );
   }
 
+  async function desbloquearComBiometria() {
+    if (enviando) {
+      return;
+    }
+
+    setErroGeral("");
+    setEnviando(true);
+
+    try {
+      await desbloquearComEntradaNativa();
+      setSenha("");
+    } catch (falha) {
+      setErroGeral(
+        falha instanceof ErroEntradaNativa
+          ? falha.message
+          : mensagemErroAuth(falha),
+      );
+      setEnviando(false);
+    }
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.conteudo}
@@ -106,8 +142,8 @@ export default function Entrar() {
 
         {motivoEncerramento === "segundo-plano" && (
           <Texto accessibilityRole="alert" style={styles.aviso}>
-            Você saiu do aplicativo, então a sessão foi encerrada. Entre
-            novamente para continuar.
+            O aplicativo ficou em segundo plano por tempo demais. Entre com
+            sua senha ou use a biometria para desbloquear sua sessão Firebase.
           </Texto>
         )}
 
@@ -142,6 +178,21 @@ export default function Entrar() {
           erro={erros.senha}
         />
 
+        {contaBloqueada && entradaNativaDisponivel && (
+          <>
+            <Botao
+              titulo={
+                enviando ? "Confirmando..." : "Entrar com biometria"
+              }
+              onPress={desbloquearComBiometria}
+              desabilitado={enviando}
+              dica="Desbloqueia a sessão Firebase salva neste aparelho após confirmação biométrica."
+            />
+
+            <View style={styles.espaco} />
+          </>
+        )}
+
         {erroGeral !== "" && (
           <Texto
             accessibilityRole="alert"
@@ -174,6 +225,19 @@ export default function Entrar() {
           secundario
           onPress={() => router.push("/cadastrar")}
         />
+
+        {contaBloqueada && (
+          <>
+            <View style={styles.espaco} />
+
+            <Botao
+              titulo="Encerrar sessão salva"
+              secundario
+              onPress={sair}
+              dica="Remove do aparelho a sessão Firebase que está bloqueada."
+            />
+          </>
+        )}
       </View>
     </ScrollView>
   );

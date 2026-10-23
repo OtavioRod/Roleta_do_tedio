@@ -1,7 +1,8 @@
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
 import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Props = {
   rotulo: string;
@@ -20,7 +21,8 @@ export default function CaixaMarcacao({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
+      <TouchableLibras
+        textoTraducao={rotulo}
         onPress={() => aoAlternar(!marcado)}
         activeOpacity={0.7}
         accessibilityRole="checkbox"
@@ -38,12 +40,19 @@ export default function CaixaMarcacao({
           ]}
         >
           {marcado && (
-            <Texto style={[styles.marca, { color: cores.botaoTexto }]}>✓</Texto>
+            <Texto
+              librasIgnorado
+              style={[styles.marca, { color: cores.botaoTexto }]}
+            >
+              ✓
+            </Texto>
           )}
         </View>
 
-        <Texto style={styles.rotulo}>{rotulo}</Texto>
-      </TouchableOpacity>
+        <Texto librasIgnorado style={styles.rotulo}>
+          {rotulo}
+        </Texto>
+      </TouchableLibras>
 
       {erro ? (
         <Texto

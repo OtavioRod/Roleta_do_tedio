@@ -1,4 +1,7 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+
+import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Jogo = {
   id: string;
@@ -28,84 +31,91 @@ export default function ResultadoJogos({
   return (
     <View style={styles.areaResultado}>
       <View style={styles.container}>
-        <Text style={styles.titulo}>{titulo}</Text>
+        <Texto style={styles.titulo}>{titulo}</Texto>
 
-        <Text style={styles.subtitulo}>{subtitulo}</Text>
+        <Texto style={styles.subtitulo}>{subtitulo}</Texto>
 
         {jogos.length === 0 ? (
           <View style={styles.semJogos}>
-            <Text style={styles.semJogosTitulo}>
+            <Texto style={styles.semJogosTitulo}>
               Não encontramos jogos para esse momento.
-            </Text>
+            </Texto>
 
-            <Text style={styles.semJogosTexto}>
+            <Texto style={styles.semJogosTexto}>
               Podemos adicionar mais opções de acordo com o número de pessoas,
               tempo disponível e disposição do grupo.
-            </Text>
+            </Texto>
           </View>
         ) : (
           <View style={styles.lista}>
             {jogos.map((jogo) => (
               <View key={jogo.id} style={styles.card}>
-                <Text style={styles.nome}>{jogo.nome}</Text>
+                <Texto style={styles.nome}>{jogo.nome}</Texto>
 
                 {jogo.categoria && (
                   <View style={styles.categoria}>
-                    <Text style={styles.textoCategoria}>{jogo.categoria}</Text>
+                    <Texto style={styles.textoCategoria}>
+                      {jogo.categoria}
+                    </Texto>
                   </View>
                 )}
 
-                <Text style={styles.descricao}>{jogo.descricao}</Text>
+                <Texto style={styles.descricao}>{jogo.descricao}</Texto>
 
                 <View style={styles.informacoes}>
                   {jogo.jogadoresMinimos !== undefined &&
                     jogo.jogadoresMaximos !== undefined && (
                       <View style={styles.informacaoBloco}>
-                        <Text style={styles.informacaoLabel}>Jogadores</Text>
+                        <Texto style={styles.informacaoLabel}>Jogadores</Texto>
 
-                        <Text style={styles.informacaoValor}>
+                        <Texto style={styles.informacaoValor}>
                           {jogo.jogadoresMinimos} a {jogo.jogadoresMaximos}
-                        </Text>
+                        </Texto>
                       </View>
                     )}
 
                   {jogo.tempo !== undefined && (
                     <View style={styles.informacaoBloco}>
-                      <Text style={styles.informacaoLabel}>Tempo</Text>
+                      <Texto style={styles.informacaoLabel}>Tempo</Texto>
 
-                      <Text style={styles.informacaoValor}>
+                      <Texto style={styles.informacaoValor}>
                         {jogo.tempo} min
-                      </Text>
+                      </Texto>
                     </View>
                   )}
 
                   {jogo.gasto && (
                     <View style={styles.informacaoBloco}>
-                      <Text style={styles.informacaoLabel}>Gasto</Text>
+                      <Texto style={styles.informacaoLabel}>Gasto</Texto>
 
-                      <Text style={styles.informacaoValor}>{jogo.gasto}</Text>
+                      <Texto style={styles.informacaoValor}>{jogo.gasto}</Texto>
                     </View>
                   )}
 
                   {jogo.dificuldade && (
                     <View style={styles.informacaoBloco}>
-                      <Text style={styles.informacaoLabel}>Dificuldade</Text>
+                      <Texto style={styles.informacaoLabel}>
+                        Dificuldade
+                      </Texto>
 
-                      <Text style={styles.informacaoValor}>
+                      <Texto style={styles.informacaoValor}>
                         {jogo.dificuldade}
-                      </Text>
+                      </Texto>
                     </View>
                   )}
                 </View>
 
                 {onSelecionarJogo && (
-                  <TouchableOpacity
+                  <TouchableLibras
+                    textoTraducao="Escolher este jogo"
                     style={styles.botao}
                     onPress={() => onSelecionarJogo(jogo)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.textoBotao}>Escolher este jogo</Text>
-                  </TouchableOpacity>
+                    <Texto librasIgnorado style={styles.textoBotao}>
+                      Escolher este jogo
+                    </Texto>
+                  </TouchableLibras>
                 )}
               </View>
             ))}

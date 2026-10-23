@@ -174,19 +174,19 @@ export default function PainelAcessibilidade() {
                   Libras
                 </Texto>
 
-                {Platform.OS === "web" && (
-                  <>
-                    <Botao
-                      titulo={`Libras: ${libras ? "ligado" : "desligado"}`}
-                      selecionado={libras}
-                      secundario={!libras}
-                      onPress={alternarLibras}
-                      dica="Mostra o avatar do VLibras que traduz textos para Libras"
-                    />
+                <Botao
+                  titulo={`Libras: ${libras ? "ligado" : "desligado"}`}
+                  selecionado={libras}
+                  secundario={!libras}
+                  onPress={alternarLibras}
+                  dica={
+                    Platform.OS === "web"
+                      ? "Mostra o avatar do VLibras que traduz textos para Libras"
+                      : "Ativa o atalho flutuante para abrir o tradutor VLibras"
+                  }
+                />
 
-                    <View style={styles.espaco} />
-                  </>
-                )}
+                <View style={styles.espaco} />
 
                 <Botao
                   titulo="Ver guia em Libras"
@@ -215,11 +215,9 @@ export default function PainelAcessibilidade() {
                     Tamanho da letra: {percentual}
                   </Texto>
 
-                  {Platform.OS === "web" && (
-                    <Texto style={styles.itemResumo}>
-                      Libras: {libras ? "Ligado" : "Desligado"}
-                    </Texto>
-                  )}
+                  <Texto style={styles.itemResumo}>
+                    Libras: {libras ? "Ligado" : "Desligado"}
+                  </Texto>
 
                   <Texto style={styles.itemResumo}>
                     Estas escolhas continuam salvas quando o aplicativo é

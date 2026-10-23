@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -20,6 +19,7 @@ import Animated, {
 
 import Botao from "../components/Botao";
 import Texto from "../components/Texto";
+import TouchableLibras from "../components/TouchableLibras";
 import { rotuloGenero } from "../constants/genero";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { LIMITE_INATIVIDADE_MS, useSessao } from "../context/SessaoContext";
@@ -107,14 +107,15 @@ function Secao({ titulo, children }: SecaoProps) {
         { borderColor: cores.borda, backgroundColor: cores.superficie },
       ]}
     >
-      <Pressable
+      <TouchableLibras
+        textoTraducao={titulo}
         accessibilityRole="button"
         accessibilityLabel={titulo}
         accessibilityState={{ expanded: expandida }}
         onPress={() => setExpandida((atual) => !atual)}
         style={styles.cabecalhoSecao}
       >
-        <Texto cabecalho style={styles.secao}>
+        <Texto librasIgnorado cabecalho style={styles.secao}>
           {titulo}
         </Texto>
         <Animated.Text
@@ -126,7 +127,7 @@ function Secao({ titulo, children }: SecaoProps) {
         >
           ›
         </Animated.Text>
-      </Pressable>
+      </TouchableLibras>
 
       {expandida && (
         <Animated.View
