@@ -8,6 +8,7 @@ import AvisoSessao from "@/components/AvisoSessao";
 import BarraConta from "@/components/BarraConta";
 import PainelAcessibilidade from "@/components/PainelAcessibilidade";
 import Texto from "@/components/Texto";
+import VLibrasAppProvider from "@/components/VLibrasAppProvider";
 import VLibrasWidget from "@/components/VLibrasWidget";
 import {
   PreferenciasProvider,
@@ -33,58 +34,60 @@ function Conteudo() {
 
   return (
     <ThemeProvider value={tema === "escuro" ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
+      <VLibrasAppProvider>
+        <AnimatedSplashOverlay />
 
-      <View style={[styles.raiz, { backgroundColor: cores.fundo }]}>
-        {carregando ? (
-          <View
-            style={styles.carregando}
-            accessibilityRole="progressbar"
-            accessibilityLabel="Verificando sua sessão"
-          >
-            <ActivityIndicator size="large" color={cores.destaque} />
+        <View style={[styles.raiz, { backgroundColor: cores.fundo }]}>
+          {carregando ? (
+            <View
+              style={styles.carregando}
+              accessibilityRole="progressbar"
+              accessibilityLabel="Verificando sua sessão"
+            >
+              <ActivityIndicator size="large" color={cores.destaque} />
 
-            <Texto>Verificando sua sessão...</Texto>
-          </View>
-        ) : (
-          <>
-            {autenticado && <BarraConta />}
-
-            <View style={styles.pilha}>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: cores.fundo },
-                }}
-              >
-                <Stack.Protected guard={liberado && permissoesConcluidas}>
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="perfil" />
-                </Stack.Protected>
-
-                <Stack.Protected guard={liberado}>
-                  <Stack.Screen name="permissoes" />
-                </Stack.Protected>
-
-                <Stack.Protected guard={autenticado && !emailOk}>
-                  <Stack.Screen name="verificar-email" />
-                </Stack.Protected>
-
-                <Stack.Protected guard={!autenticado}>
-                  <Stack.Screen name="entrar" />
-                  <Stack.Screen name="cadastrar" />
-                </Stack.Protected>
-              </Stack>
+              <Texto>Verificando sua sessão...</Texto>
             </View>
-          </>
-        )}
+          ) : (
+            <>
+              {autenticado && <BarraConta />}
 
-        <PainelAcessibilidade />
+              <View style={styles.pilha}>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: cores.fundo },
+                  }}
+                >
+                  <Stack.Protected guard={liberado && permissoesConcluidas}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="perfil" />
+                  </Stack.Protected>
 
-        <AvisoSessao />
-      </View>
+                  <Stack.Protected guard={liberado}>
+                    <Stack.Screen name="permissoes" />
+                  </Stack.Protected>
 
-      <VLibrasWidget />
+                  <Stack.Protected guard={autenticado && !emailOk}>
+                    <Stack.Screen name="verificar-email" />
+                  </Stack.Protected>
+
+                  <Stack.Protected guard={!autenticado}>
+                    <Stack.Screen name="entrar" />
+                    <Stack.Screen name="cadastrar" />
+                  </Stack.Protected>
+                </Stack>
+              </View>
+            </>
+          )}
+
+          <PainelAcessibilidade />
+
+          <AvisoSessao />
+        </View>
+
+        <VLibrasWidget />
+      </VLibrasAppProvider>
     </ThemeProvider>
   );
 }

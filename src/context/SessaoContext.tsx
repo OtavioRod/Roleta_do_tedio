@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createUserWithEmailAndPassword,
+  getIdToken,
   onAuthStateChanged,
   reload,
   sendEmailVerification,
@@ -23,6 +24,12 @@ import {
 import { AppState, PanResponder, Platform, View } from "react-native";
 
 import { Genero } from "../constants/genero";
+import {
+  confirmarEntradaNativa,
+  ErroEntradaNativa,
+  gravarEntradaNativaAtivada,
+  lerEntradaNativaAtivada,
+} from "../services/entradaNativa";
 import { obterAuth } from "../services/firebase";
 import {
   carregarPerfil,
@@ -46,9 +53,10 @@ export const LIMITE_INATIVIDADE_MS =
   lerSegundos(process.env.EXPO_PUBLIC_LIMITE_INATIVIDADE_SEGUNDOS, 300) *
   SEGUNDO;
 
-const LIMITE_SEGUNDO_PLANO_MS =
-  lerSegundos(process.env.EXPO_PUBLIC_LIMITE_SEGUNDO_PLANO_SEGUNDOS, 0) *
-  SEGUNDO;
+const SEGUNDOS_LIMITE_SEGUNDO_PLANO =
+  lerSegundos(process.env.EXPO_PUBLIC_LIMITE_SEGUNDO_PLANO_SEGUNDOS, 300) ||
+  300;
+const LIMITE_SEGUNDO_PLANO_MS = SEGUNDOS_LIMITE_SEGUNDO_PLANO * SEGUNDO;
 
 export const EXIGIR_EMAIL_VERIFICADO =
   process.env.EXPO_PUBLIC_EXIGIR_EMAIL_VERIFICADO !== "false";
@@ -95,7 +103,10 @@ type SessaoContexto = {
   permissoesConcluidas: boolean;
   avisoExpiracao: boolean;
   motivoEncerramento: MotivoEncerramento | null;
+  contaBloqueada: User | null;
+  entradaNativaDisponivel: boolean;
   entrar: (email: string, senha: string) => Promise<void>;
+  desbloquearComEntradaNativa: () => Promise<void>;
   cadastrar: (dados: DadosCadastro) => Promise<void>;
   sair: () => Promise<void>;
   verificarEmail: () => Promise<boolean>;
@@ -109,6 +120,7 @@ type SessaoContexto = {
   registrarAtividade: () => void;
   tempoRestanteMs: () => number;
   limparMotivo: () => void;
+  definirEntradaNativa: (ativada: boolean) => Promise<void>;
   executarSemExpirar: <T>(acao: () => Promise<T>) => Promise<T>;
 };
 
@@ -191,11 +203,19 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   const [avisoExpiracao, setAvisoExpiracao] = useState(false);
   const [motivoEncerramento, setMotivoEncerramento] =
     useState<MotivoEncerramento | null>(null);
+  const [contaBloqueada, setContaBloqueada] = useState<User | null>(null);
+  const [entradaNativaDisponivel, setEntradaNativaDisponivel] = useState(false);
 
   const ultimaAtividade = useRef(Date.now());
   const ultimaGravacao = useRef(0);
   const sessaoLocal = useRef<SessaoLocal | null>(null);
   const novoLogin = useRef(false);
+  const entradaPendente = useRef<Promise<void> | null>(null);
+  const uidEntradaRecusada = useRef<string | null>(null);
+  const uidSessaoAtiva = useRef<string | null>(null);
+  const contaBloqueadaRef = useRef<User | null>(null);
+  const promptNativo = useRef(false);
+  const segundoPlanoDurantePrompt = useRef(false);
   const dadosPendentes = useRef<NovoPerfil | null>(null);
   const encerrando = useRef(false);
   const pausas = useRef(0);
@@ -206,6 +226,8 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
   const limparEstado = useCallback(() => {
     sessaoLocal.current = null;
+    uidSessaoAtiva.current = null;
+    contaBloqueadaRef.current = null;
     saiuEm.current = null;
     emailVerificadoRef.current = false;
 
@@ -215,6 +237,139 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     setEmailVerificado(false);
     setPermissoesConcluidas(false);
     setAvisoExpiracao(false);
+    setContaBloqueada(null);
+    setEntradaNativaDisponivel(false);
+  }, []);
+
+  const estabelecerSessao = useCallback(
+    async (
+      usuarioAtual: User,
+      eraNovoLogin: boolean,
+      aindaAtivo: () => boolean = () => true,
+    ) => {
+      if (
+        uidSessaoAtiva.current === usuarioAtual.uid &&
+        sessaoLocal.current?.uid === usuarioAtual.uid
+      ) {
+        setCarregando(false);
+        return;
+      }
+
+      const agora = Date.now();
+      const anterior = sessaoLocal.current;
+      const sessaoAtual: SessaoLocal = {
+        uid: usuarioAtual.uid,
+        sessaoId:
+          anterior?.uid === usuarioAtual.uid
+            ? anterior.sessaoId
+            : gerarIdSessao(),
+        iniciadaEm:
+          anterior?.uid === usuarioAtual.uid ? anterior.iniciadaEm : agora,
+        ultimaAtividade: agora,
+        saiuEm: null,
+      };
+
+      uidSessaoAtiva.current = usuarioAtual.uid;
+      sessaoLocal.current = sessaoAtual;
+      contaBloqueadaRef.current = null;
+      novoLogin.current = false;
+      saiuEm.current = null;
+      ultimaAtividade.current = agora;
+      ultimaGravacao.current = agora;
+      emailVerificadoRef.current = usuarioAtual.emailVerified;
+
+      await gravarSessaoLocal(sessaoAtual);
+
+      const concluidas = await lerPermissoesConcluidas(usuarioAtual.uid);
+
+      if (!aindaAtivo()) {
+        return;
+      }
+
+      setMotivoEncerramento(null);
+      setContaBloqueada(null);
+      setEntradaNativaDisponivel(false);
+      setSessao({
+        id: sessaoAtual.sessaoId,
+        iniciadaEm: sessaoAtual.iniciadaEm,
+      });
+      setEmailVerificado(usuarioAtual.emailVerified);
+      setPermissoesConcluidas(concluidas);
+      setUsuario(usuarioAtual);
+
+      try {
+        if (eraNovoLogin) {
+          const novo: NovoPerfil = dadosPendentes.current ?? {
+            nome:
+              usuarioAtual.displayName ??
+              usuarioAtual.email?.split("@")[0] ??
+              "Pessoa",
+            genero: "nao-informar",
+            notificacoes: { email: false, push: false },
+          };
+
+          dadosPendentes.current = null;
+
+          setPerfil(
+            await registrarLoginNoPerfil(
+              usuarioAtual.uid,
+              usuarioAtual.email ?? "",
+              novo,
+            ),
+          );
+        } else {
+          setPerfil(await carregarPerfil(usuarioAtual.uid));
+        }
+      } catch (erro) {
+        console.warn("Não foi possível carregar o perfil:", erro);
+      }
+
+      if (aindaAtivo()) {
+        setCarregando(false);
+      }
+    },
+    [],
+  );
+
+  const bloquearPorSegundoPlano = useCallback(async (usuarioAtual: User) => {
+    if (obterAuth().currentUser?.uid !== usuarioAtual.uid) {
+      return;
+    }
+
+    const local = sessaoLocal.current;
+
+    uidSessaoAtiva.current = null;
+    sessaoLocal.current = null;
+    saiuEm.current = local?.saiuEm ?? Date.now();
+    emailVerificadoRef.current = false;
+    contaBloqueadaRef.current = usuarioAtual;
+
+    setMotivoEncerramento("segundo-plano");
+    setUsuario(null);
+    setPerfil(null);
+    setSessao(null);
+    setEmailVerificado(false);
+    setPermissoesConcluidas(false);
+    setAvisoExpiracao(false);
+    setContaBloqueada(usuarioAtual);
+    setEntradaNativaDisponivel(false);
+    setCarregando(false);
+
+    if (local?.uid === usuarioAtual.uid && local.saiuEm !== null) {
+      await gravarSessaoLocal(local);
+    }
+
+    try {
+      setEntradaNativaDisponivel(
+        await lerEntradaNativaAtivada(usuarioAtual.uid),
+      );
+    } catch (erro) {
+      console.warn(
+        "Não foi possível verificar a preferência de entrada nativa:",
+        erro,
+      );
+      setEntradaNativaDisponivel(false);
+    }
   }, []);
 
   const encerrar = useCallback(
@@ -250,9 +405,31 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const loginPendente = usuarioAtual ? entradaPendente.current : null;
+
+      if (loginPendente) {
+        await loginPendente;
+      }
+
+      if (!ativo) {
+        return;
+      }
+
+      if (
+        usuarioAtual &&
+        obterAuth().currentUser?.uid !== usuarioAtual.uid
+      ) {
+        return;
+      }
+
       if (!usuarioAtual) {
+        uidEntradaRecusada.current = null;
         limparEstado();
         setCarregando(false);
+        return;
+      }
+
+      if (uidEntradaRecusada.current === usuarioAtual.uid) {
         return;
       }
 
@@ -299,6 +476,12 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
             return;
           }
 
+          if (motivo === "segundo-plano" && local) {
+            sessaoLocal.current = local;
+            await bloquearPorSegundoPlano(usuarioAtual);
+            return;
+          }
+
           setMotivoEncerramento(motivo);
 
           await limparSessaoLocal();
@@ -309,74 +492,18 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      if (!ativo) {
-        return;
+      if (local) {
+        sessaoLocal.current = local;
       }
 
-      const sessaoAtual: SessaoLocal = {
-        ...local,
-        ultimaAtividade: agora,
-        saiuEm: null,
-      };
-
-      sessaoLocal.current = sessaoAtual;
-      ultimaAtividade.current = agora;
-      ultimaGravacao.current = agora;
-      emailVerificadoRef.current = usuarioAtual.emailVerified;
-
-      await gravarSessaoLocal(sessaoAtual);
-
-      const concluidas = await lerPermissoesConcluidas(usuarioAtual.uid);
-
-      if (!ativo) {
-        return;
-      }
-
-      setSessao({
-        id: sessaoAtual.sessaoId,
-        iniciadaEm: sessaoAtual.iniciadaEm,
-      });
-      setEmailVerificado(usuarioAtual.emailVerified);
-      setPermissoesConcluidas(concluidas);
-      setUsuario(usuarioAtual);
-
-      try {
-        if (eraNovoLogin) {
-          const novo: NovoPerfil = dadosPendentes.current ?? {
-            nome:
-              usuarioAtual.displayName ??
-              usuarioAtual.email?.split("@")[0] ??
-              "Pessoa",
-            genero: "nao-informar",
-            notificacoes: { email: false, push: false },
-          };
-
-          dadosPendentes.current = null;
-
-          setPerfil(
-            await registrarLoginNoPerfil(
-              usuarioAtual.uid,
-              usuarioAtual.email ?? "",
-              novo,
-            ),
-          );
-        } else {
-          setPerfil(await carregarPerfil(usuarioAtual.uid));
-        }
-      } catch (erro) {
-        console.warn("Não foi possível carregar o perfil:", erro);
-      }
-
-      if (ativo) {
-        setCarregando(false);
-      }
+      await estabelecerSessao(usuarioAtual, eraNovoLogin, () => ativo);
     });
 
     return () => {
       ativo = false;
       cancelar();
     };
-  }, [limparEstado]);
+  }, [bloquearPorSegundoPlano, estabelecerSessao, limparEstado]);
 
   const registrarAtividade = useCallback(() => {
     ultimaAtividade.current = Date.now();
@@ -418,11 +545,23 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   }, [usuario, encerrar]);
 
   useEffect(() => {
-    if (!usuario) {
-      return undefined;
-    }
-
     const assinatura = AppState.addEventListener("change", (estado) => {
+      if (promptNativo.current) {
+        if (estado === "background") {
+          segundoPlanoDurantePrompt.current = true;
+
+          if (usuario) {
+            void encerrar(null);
+          }
+        }
+
+        return;
+      }
+
+      if (!usuario) {
+        return;
+      }
+
       if (estado === "background") {
         if (pausas.current > 0) {
           return;
@@ -457,7 +596,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
           saida !== null &&
           agora - saida >= LIMITE_SEGUNDO_PLANO_MS
         ) {
-          encerrar("segundo-plano");
+          void bloquearPorSegundoPlano(usuario);
           return;
         }
 
@@ -477,7 +616,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
     });
 
     return () => assinatura.remove();
-  }, [usuario, encerrar]);
+  }, [usuario, bloquearPorSegundoPlano, encerrar]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") {
@@ -520,22 +659,183 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   );
 
   const entrar = useCallback(async (email: string, senha: string) => {
-    novoLogin.current = true;
+    let liberarEntrada: (() => void) | undefined;
+    const aguardandoEntrada = new Promise<void>((resolve) => {
+      liberarEntrada = resolve;
+    });
+    const uidBloqueado = contaBloqueadaRef.current?.uid ?? null;
 
-    setMotivoEncerramento(null);
+    entradaPendente.current = aguardandoEntrada;
+    novoLogin.current = false;
+    uidEntradaRecusada.current = null;
 
     try {
-      await signInWithEmailAndPassword(
+      const credencial = await signInWithEmailAndPassword(
         obterAuth(),
         normalizarEmail(email),
         senha,
       );
+      if (AppState.currentState !== "active") {
+        throw new ErroEntradaNativa(
+          "Login cancelado porque o aplicativo saiu do primeiro plano.",
+        );
+      }
+
+      const desbloqueioComSenha =
+        uidBloqueado !== null && credencial.user.uid === uidBloqueado;
+
+      if (
+        !desbloqueioComSenha &&
+        (await lerEntradaNativaAtivada(credencial.user.uid))
+      ) {
+        promptNativo.current = true;
+        segundoPlanoDurantePrompt.current = false;
+
+        try {
+          await confirmarEntradaNativa("Confirmar entrada");
+        } finally {
+          promptNativo.current = false;
+        }
+
+        if (segundoPlanoDurantePrompt.current) {
+          throw new ErroEntradaNativa(
+            "Entrada cancelada porque o aplicativo foi para segundo plano.",
+          );
+        }
+      }
+
+      if (
+        AppState.currentState !== "active" ||
+        obterAuth().currentUser?.uid !== credencial.user.uid
+      ) {
+        throw new ErroEntradaNativa(
+          "Login cancelado porque a sessão foi interrompida.",
+        );
+      }
+
+      novoLogin.current = true;
+      await estabelecerSessao(credencial.user, true);
     } catch (erro) {
       novoLogin.current = false;
 
+      const usuarioAutenticado = obterAuth().currentUser;
+
+      if (
+        usuarioAutenticado &&
+        usuarioAutenticado.uid !== uidBloqueado
+      ) {
+        uidEntradaRecusada.current = usuarioAutenticado.uid;
+
+        try {
+          await signOut(obterAuth());
+        } catch (falhaAoEncerrar) {
+          console.warn(
+            "Não foi possível encerrar o login sem confirmação nativa:",
+            falhaAoEncerrar,
+          );
+        }
+      }
+
       throw erro;
+    } finally {
+      entradaPendente.current = null;
+      liberarEntrada?.();
     }
-  }, []);
+  }, [estabelecerSessao]);
+
+  const desbloquearComEntradaNativa = useCallback(async () => {
+    const usuarioAtual = obterAuth().currentUser;
+
+    if (
+      !contaBloqueadaRef.current ||
+      !usuarioAtual ||
+      usuarioAtual.uid !== contaBloqueadaRef.current.uid
+    ) {
+      throw new ErroEntradaNativa(
+        "Não há uma sessão Firebase bloqueada para desbloquear.",
+      );
+    }
+
+    if (!(await lerEntradaNativaAtivada(usuarioAtual.uid))) {
+      throw new ErroEntradaNativa(
+        "A entrada biométrica não está ativada para esta conta.",
+      );
+    }
+
+    promptNativo.current = true;
+    segundoPlanoDurantePrompt.current = false;
+
+    try {
+      await confirmarEntradaNativa("Desbloquear sua conta");
+    } finally {
+      promptNativo.current = false;
+    }
+
+    if (
+      segundoPlanoDurantePrompt.current ||
+      AppState.currentState !== "active" ||
+      obterAuth().currentUser?.uid !== usuarioAtual.uid
+    ) {
+      throw new ErroEntradaNativa(
+        "Desbloqueio cancelado. Confirme novamente sem sair do aplicativo.",
+      );
+    }
+
+    await getIdToken(usuarioAtual, true);
+
+    if (
+      AppState.currentState !== "active" ||
+      obterAuth().currentUser?.uid !== usuarioAtual.uid
+    ) {
+      throw new ErroEntradaNativa(
+        "A sessão foi interrompida ou expirou. Entre com seu e-mail e senha.",
+      );
+    }
+
+    await estabelecerSessao(usuarioAtual, true);
+  }, [estabelecerSessao]);
+
+  const definirEntradaNativa = useCallback(
+    async (ativada: boolean) => {
+      const atual = obterAuth().currentUser;
+
+      if (!usuario || !atual || atual.uid !== usuario.uid) {
+        throw new ErroEntradaNativa(
+          "Entre novamente para alterar a entrada nativa.",
+        );
+      }
+
+      if (ativada) {
+        promptNativo.current = true;
+        segundoPlanoDurantePrompt.current = false;
+
+        try {
+          await confirmarEntradaNativa("Ativar entrada nativa");
+        } finally {
+          promptNativo.current = false;
+        }
+
+        if (
+          segundoPlanoDurantePrompt.current ||
+          obterAuth().currentUser?.uid !== atual.uid
+        ) {
+          throw new ErroEntradaNativa(
+            "Ativação cancelada. Confirme novamente sem sair do aplicativo.",
+          );
+        }
+      }
+
+      if (obterAuth().currentUser?.uid !== atual.uid) {
+        throw new ErroEntradaNativa(
+          "A sessão foi encerrada antes de salvar a preferência.",
+        );
+      }
+
+      await gravarEntradaNativaAtivada(atual.uid, ativada);
+      registrarAtividade();
+    },
+    [registrarAtividade, usuario],
+  );
 
   const cadastrar = useCallback(async (dados: DadosCadastro) => {
     novoLogin.current = true;
@@ -680,7 +980,10 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       permissoesConcluidas,
       avisoExpiracao,
       motivoEncerramento,
+      contaBloqueada,
+      entradaNativaDisponivel,
       entrar,
+      desbloquearComEntradaNativa,
       cadastrar,
       sair,
       verificarEmail,
@@ -692,6 +995,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       registrarAtividade,
       tempoRestanteMs,
       limparMotivo,
+      definirEntradaNativa,
       executarSemExpirar,
     }),
     [
@@ -704,7 +1008,10 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       permissoesConcluidas,
       avisoExpiracao,
       motivoEncerramento,
+      contaBloqueada,
+      entradaNativaDisponivel,
       entrar,
+      desbloquearComEntradaNativa,
       cadastrar,
       sair,
       verificarEmail,
@@ -716,6 +1023,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       registrarAtividade,
       tempoRestanteMs,
       limparMotivo,
+      definirEntradaNativa,
       executarSemExpirar,
     ],
   );

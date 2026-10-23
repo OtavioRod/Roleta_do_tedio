@@ -1,8 +1,17 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
 import Animated, {
   Easing,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -10,9 +19,14 @@ import Animated, {
 
 import Botao from "../components/Botao";
 import Texto from "../components/Texto";
+import TouchableLibras from "../components/TouchableLibras";
 import { rotuloGenero } from "../constants/genero";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { LIMITE_INATIVIDADE_MS, useSessao } from "../context/SessaoContext";
+import {
+  ErroEntradaNativa,
+  lerEntradaNativaAtivada,
+} from "../services/entradaNativa";
 import {
   EstadoPermissao,
   estadoLocalizacao,
@@ -70,9 +84,7 @@ type SecaoProps = {
 function Secao({ titulo, children }: SecaoProps) {
   const { cores } = usePreferencias();
   const [expandida, setExpandida] = useState(false);
-  const [alturaConteudo, setAlturaConteudo] = useState(0);
   const rotacao = useSharedValue(0);
-  const alturaAnimada = useSharedValue(0);
 
   useEffect(() => {
     const configuracao = {
@@ -81,35 +93,29 @@ function Secao({ titulo, children }: SecaoProps) {
     };
 
     rotacao.value = withTiming(expandida ? 90 : 0, configuracao);
-    alturaAnimada.value = withTiming(
-      expandida ? alturaConteudo : 0,
-      configuracao,
-    );
-  }, [alturaAnimada, alturaConteudo, expandida, rotacao]);
+  }, [expandida, rotacao]);
 
   const estiloIndicador = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotacao.value}deg` }],
   }));
-  const estiloConteudo = useAnimatedStyle(() => ({
-    height: alturaAnimada.value,
-    overflow: "hidden",
-  }));
 
   return (
     <Animated.View
+      layout={LinearTransition.duration(300)}
       style={[
         styles.cartao,
         { borderColor: cores.borda, backgroundColor: cores.superficie },
       ]}
     >
-      <Pressable
+      <TouchableLibras
+        textoTraducao={titulo}
         accessibilityRole="button"
         accessibilityLabel={titulo}
         accessibilityState={{ expanded: expandida }}
         onPress={() => setExpandida((atual) => !atual)}
         style={styles.cabecalhoSecao}
       >
-        <Texto cabecalho style={styles.secao}>
+        <Texto librasIgnorado cabecalho style={styles.secao}>
           {titulo}
         </Texto>
         <Animated.Text
@@ -121,26 +127,16 @@ function Secao({ titulo, children }: SecaoProps) {
         >
           ›
         </Animated.Text>
-      </Pressable>
+      </TouchableLibras>
 
-      <Animated.View
-        accessibilityElementsHidden={!expandida}
-        importantForAccessibility={
-          expandida ? "auto" : "no-hide-descendants"
-        }
-        style={[
-          estiloConteudo,
-          { pointerEvents: expandida ? "auto" : "none" },
-        ]}
-      >
-        <View
-          onLayout={(evento) =>
-            setAlturaConteudo(evento.nativeEvent.layout.height)
-          }
+      {expandida && (
+        <Animated.View
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(120)}
         >
           {children}
-        </View>
-      </Animated.View>
+        </Animated.View>
+      )}
     </Animated.View>
   );
 }
@@ -150,10 +146,29 @@ export default function Perfil() {
 
   const { cores } = usePreferencias();
 
-  const { usuario, perfil, sessao, emailVerificado, tempoRestanteMs, sair } =
-    useSessao();
+  const {
+    usuario,
+    perfil,
+    sessao,
+    emailVerificado,
+    tempoRestanteMs,
+    sair,
+    definirEntradaNativa,
+  } = useSessao();
 
   const [restante, setRestante] = useState(tempoRestanteMs());
+  const [preferenciaEntradaNativa, setPreferenciaEntradaNativa] = useState<{
+    uid: string;
+    ativada: boolean;
+  } | null>(null);
+  const [uidEntradaNativaCarregada, setUidEntradaNativaCarregada] = useState<
+    string | null
+  >(null);
+  const [alterandoEntradaNativa, setAlterandoEntradaNativa] = useState(false);
+  const [erroEntradaNativa, setErroEntradaNativa] = useState<{
+    uid: string;
+    mensagem: string;
+  } | null>(null);
   const [localizacao, setLocalizacao] =
     useState<EstadoPermissao>("indisponivel");
   const [notificacoes, setNotificacoes] =
@@ -164,6 +179,39 @@ export default function Perfil() {
 
     return () => clearInterval(intervalo);
   }, [tempoRestanteMs]);
+
+  useEffect(() => {
+    let ativo = true;
+
+    if (!usuario || Platform.OS === "web") {
+      return undefined;
+    }
+
+    void lerEntradaNativaAtivada(usuario.uid)
+      .then((ativada) => {
+        if (ativo) {
+          setPreferenciaEntradaNativa({ uid: usuario.uid, ativada });
+        }
+      })
+      .catch(() => {
+        if (ativo) {
+          setErroEntradaNativa({
+            uid: usuario.uid,
+            mensagem:
+              "Não foi possível carregar a preferência de entrada nativa.",
+          });
+        }
+      })
+      .finally(() => {
+        if (ativo) {
+          setUidEntradaNativaCarregada(usuario.uid);
+        }
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [usuario]);
 
   useEffect(() => {
     let ativo = true;
@@ -188,6 +236,44 @@ export default function Perfil() {
   const nome = perfil?.nome || usuario?.displayName || "Sem nome";
 
   const email = perfil?.email || usuario?.email || "";
+
+  const entradaNativaAtivada =
+    usuario?.uid === preferenciaEntradaNativa?.uid &&
+    preferenciaEntradaNativa?.ativada === true;
+  const carregandoEntradaNativa =
+    !!usuario && uidEntradaNativaCarregada !== usuario.uid;
+  const mensagemErroEntradaNativa =
+    usuario?.uid === erroEntradaNativa?.uid
+      ? erroEntradaNativa?.mensagem ?? ""
+      : "";
+
+  async function alterarEntradaNativa(ativada: boolean) {
+    if (alterandoEntradaNativa) {
+      return;
+    }
+
+    setAlterandoEntradaNativa(true);
+    setErroEntradaNativa(null);
+
+    try {
+      await definirEntradaNativa(ativada);
+      if (usuario) {
+        setPreferenciaEntradaNativa({ uid: usuario.uid, ativada });
+      }
+    } catch (erro) {
+      setErroEntradaNativa(
+        {
+          uid: usuario?.uid ?? "",
+          mensagem:
+            erro instanceof ErroEntradaNativa
+              ? erro.message
+              : "Não foi possível salvar a preferência de entrada nativa.",
+        },
+      );
+    } finally {
+      setAlterandoEntradaNativa(false);
+    }
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.conteudo}>
@@ -214,6 +300,44 @@ export default function Perfil() {
             valor={formatarData(perfil?.ultimoLoginEm)}
           />
         </Secao>
+
+        {Platform.OS !== "web" && (
+          <Secao titulo="Entrada nativa">
+            <Texto style={styles.descricaoEntradaNativa}>
+              Use a confirmação do sistema neste aparelho depois de entrar com
+              sua senha. A preferência vale somente para esta conta e não salva
+              sua senha.
+            </Texto>
+
+            <View style={styles.linhaEntradaNativa}>
+              <Texto style={styles.rotuloEntradaNativa}>
+                Ativar entrada nativa
+              </Texto>
+
+              <Switch
+                value={entradaNativaAtivada}
+                onValueChange={alterarEntradaNativa}
+                disabled={carregandoEntradaNativa || alterandoEntradaNativa}
+                accessibilityRole="switch"
+                accessibilityLabel="Entrada nativa"
+                accessibilityHint="Pede confirmação do sistema após o login por senha."
+                accessibilityState={{
+                  checked: entradaNativaAtivada,
+                  disabled: carregandoEntradaNativa || alterandoEntradaNativa,
+                }}
+              />
+            </View>
+
+            {mensagemErroEntradaNativa !== "" && (
+              <Texto
+                accessibilityRole="alert"
+                style={[styles.erroEntradaNativa, { color: cores.erro }]}
+              >
+                {mensagemErroEntradaNativa}
+              </Texto>
+            )}
+          </Secao>
+        )}
 
         <Secao titulo="Avisos e permissões">
           <Linha
@@ -296,6 +420,32 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
     flex: 1,
+  },
+
+  descricaoEntradaNativa: {
+    fontSize: 15,
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+
+  linhaEntradaNativa: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  rotuloEntradaNativa: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  erroEntradaNativa: {
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 20,
+    marginTop: 12,
   },
 
   cartao: {
