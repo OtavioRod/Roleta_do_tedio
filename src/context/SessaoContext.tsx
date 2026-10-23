@@ -23,6 +23,12 @@ import {
 import { AppState, PanResponder, Platform, View } from "react-native";
 
 import { Genero } from "../constants/genero";
+import {
+  confirmarEntradaNativa,
+  ErroEntradaNativa,
+  gravarEntradaNativaAtivada,
+  lerEntradaNativaAtivada,
+} from "../services/entradaNativa";
 import { obterAuth } from "../services/firebase";
 import {
   carregarPerfil,
@@ -109,6 +115,7 @@ type SessaoContexto = {
   registrarAtividade: () => void;
   tempoRestanteMs: () => number;
   limparMotivo: () => void;
+  definirEntradaNativa: (ativada: boolean) => Promise<void>;
   executarSemExpirar: <T>(acao: () => Promise<T>) => Promise<T>;
 };
 
@@ -196,6 +203,10 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   const ultimaGravacao = useRef(0);
   const sessaoLocal = useRef<SessaoLocal | null>(null);
   const novoLogin = useRef(false);
+  const entradaPendente = useRef<Promise<void> | null>(null);
+  const uidEntradaRecusada = useRef<string | null>(null);
+  const promptNativo = useRef(false);
+  const segundoPlanoDurantePrompt = useRef(false);
   const dadosPendentes = useRef<NovoPerfil | null>(null);
   const encerrando = useRef(false);
   const pausas = useRef(0);
@@ -250,9 +261,31 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      const loginPendente = usuarioAtual ? entradaPendente.current : null;
+
+      if (loginPendente) {
+        await loginPendente;
+      }
+
+      if (!ativo) {
+        return;
+      }
+
+      if (
+        usuarioAtual &&
+        obterAuth().currentUser?.uid !== usuarioAtual.uid
+      ) {
+        return;
+      }
+
       if (!usuarioAtual) {
+        uidEntradaRecusada.current = null;
         limparEstado();
         setCarregando(false);
+        return;
+      }
+
+      if (uidEntradaRecusada.current === usuarioAtual.uid) {
         return;
       }
 
@@ -418,11 +451,23 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   }, [usuario, encerrar]);
 
   useEffect(() => {
-    if (!usuario) {
-      return undefined;
-    }
-
     const assinatura = AppState.addEventListener("change", (estado) => {
+      if (promptNativo.current) {
+        if (estado === "background") {
+          segundoPlanoDurantePrompt.current = true;
+
+          if (usuario) {
+            void encerrar(null);
+          }
+        }
+
+        return;
+      }
+
+      if (!usuario) {
+        return;
+      }
+
       if (estado === "background") {
         if (pausas.current > 0) {
           return;
@@ -520,22 +565,107 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   );
 
   const entrar = useCallback(async (email: string, senha: string) => {
-    novoLogin.current = true;
+    let liberarEntrada: (() => void) | undefined;
+    const aguardandoEntrada = new Promise<void>((resolve) => {
+      liberarEntrada = resolve;
+    });
 
+    entradaPendente.current = aguardandoEntrada;
+    novoLogin.current = false;
+    uidEntradaRecusada.current = null;
     setMotivoEncerramento(null);
 
     try {
-      await signInWithEmailAndPassword(
+      const credencial = await signInWithEmailAndPassword(
         obterAuth(),
         normalizarEmail(email),
         senha,
       );
+
+      if (await lerEntradaNativaAtivada(credencial.user.uid)) {
+        promptNativo.current = true;
+        segundoPlanoDurantePrompt.current = false;
+
+        try {
+          await confirmarEntradaNativa("Confirmar entrada");
+        } finally {
+          promptNativo.current = false;
+        }
+
+        if (segundoPlanoDurantePrompt.current) {
+          throw new ErroEntradaNativa(
+            "Entrada cancelada porque o aplicativo foi para segundo plano.",
+          );
+        }
+      }
+
+      novoLogin.current = true;
     } catch (erro) {
       novoLogin.current = false;
 
+      const usuarioAutenticado = obterAuth().currentUser;
+
+      if (usuarioAutenticado) {
+        uidEntradaRecusada.current = usuarioAutenticado.uid;
+
+        try {
+          await signOut(obterAuth());
+        } catch (falhaAoEncerrar) {
+          console.warn(
+            "Não foi possível encerrar o login sem confirmação nativa:",
+            falhaAoEncerrar,
+          );
+        }
+      }
+
       throw erro;
+    } finally {
+      entradaPendente.current = null;
+      liberarEntrada?.();
     }
   }, []);
+
+  const definirEntradaNativa = useCallback(
+    async (ativada: boolean) => {
+      const atual = obterAuth().currentUser;
+
+      if (!usuario || !atual || atual.uid !== usuario.uid) {
+        throw new ErroEntradaNativa(
+          "Entre novamente para alterar a entrada nativa.",
+        );
+      }
+
+      if (ativada) {
+        promptNativo.current = true;
+        segundoPlanoDurantePrompt.current = false;
+
+        try {
+          await confirmarEntradaNativa("Ativar entrada nativa");
+        } finally {
+          promptNativo.current = false;
+        }
+
+        if (
+          segundoPlanoDurantePrompt.current ||
+          obterAuth().currentUser?.uid !== atual.uid
+        ) {
+          throw new ErroEntradaNativa(
+            "Ativação cancelada. Confirme novamente sem sair do aplicativo.",
+          );
+        }
+      }
+
+      if (obterAuth().currentUser?.uid !== atual.uid) {
+        throw new ErroEntradaNativa(
+          "A sessão foi encerrada antes de salvar a preferência.",
+        );
+      }
+
+      await gravarEntradaNativaAtivada(atual.uid, ativada);
+      registrarAtividade();
+    },
+    [registrarAtividade, usuario],
+  );
 
   const cadastrar = useCallback(async (dados: DadosCadastro) => {
     novoLogin.current = true;
@@ -692,6 +822,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       registrarAtividade,
       tempoRestanteMs,
       limparMotivo,
+      definirEntradaNativa,
       executarSemExpirar,
     }),
     [
@@ -716,6 +847,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       registrarAtividade,
       tempoRestanteMs,
       limparMotivo,
+      definirEntradaNativa,
       executarSemExpirar,
     ],
   );

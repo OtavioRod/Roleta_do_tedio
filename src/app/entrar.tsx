@@ -8,6 +8,7 @@ import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
 import { firebaseConfigurado } from "../services/firebase";
+import { ErroEntradaNativa } from "../services/entradaNativa";
 import { codigoErroAuth, mensagemErroAuth } from "../utils/mensagensAuth";
 import { validarEmail, validarLogin } from "../utils/validacoes";
 
@@ -46,7 +47,11 @@ export default function Entrar() {
     try {
       await entrar(email, senha);
     } catch (falha) {
-      setErroGeral(mensagemErroAuth(falha));
+      setErroGeral(
+        falha instanceof ErroEntradaNativa
+          ? falha.message
+          : mensagemErroAuth(falha),
+      );
       setEnviando(false);
     }
   }
