@@ -1,4 +1,5 @@
 import * as Location from "expo-location";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
@@ -42,6 +43,7 @@ import { salvarSessao } from "../services/backend";
 import { buscarEventos, Evento } from "../services/eventos";
 import { buscarFilmes, Filme } from "../services/filmes";
 import { buscarReceitas, Receita } from "../services/receitas";
+import { carregarSalaParaResultado } from "../services/salas";
 
 const VELOCIDADE_DIGITACAO = 18;
 
@@ -585,6 +587,13 @@ function Carregando({ texto, grande }: CarregandoProps) {
 export default function Index() {
   const { cores } = usePreferencias();
   const { executarSemExpirar } = useSessao();
+
+  const router = useRouter();
+
+  const { sala: codigoSalaOnline } = useLocalSearchParams<{ sala?: string }>();
+
+  const modoOnline = Boolean(codigoSalaOnline);
+
   const [iniciou, setIniciou] = useState(false);
   const [tipo, setTipo] = useState<Tipo | "">("");
   const [salaCriada, setSalaCriada] = useState(false);
@@ -677,6 +686,56 @@ export default function Index() {
       assinatura.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (!codigoSalaOnline) {
+      return undefined;
+    }
+
+    let ativo = true;
+
+    (async () => {
+      try {
+        const dados = await carregarSalaParaResultado(codigoSalaOnline);
+
+        if (!ativo || !dados) {
+          return;
+        }
+
+        const atividade = atividades.find(
+          (item) => item.id === dados.resultado.atividadeId,
+        );
+
+        if (!atividade) {
+          return;
+        }
+
+        setIniciou(true);
+        setTipo(dados.tipo);
+        setSalaCriada(true);
+        setCodigoSala(dados.codigo);
+        setParticipantes(
+          dados.participantes.map((participante) => ({
+            id: participante.uid,
+            nome: participante.nome,
+            humor: participante.humor,
+            gasto: participante.gasto,
+            disposicao: participante.disposicao,
+            tempo: participante.tempo,
+          })),
+        );
+        setAtividadeEscolhida(atividade);
+        setAtividadeSemFiltro(dados.resultado.semFiltro);
+        setEtapa("resultado");
+      } catch (falha) {
+        console.warn("Não foi possível carregar a sala:", falha);
+      }
+    })();
+
+    return () => {
+      ativo = false;
+    };
+  }, [codigoSalaOnline]);
 
   const estiloErro = [styles.erro, { color: cores.erro }];
 
@@ -1786,6 +1845,14 @@ export default function Index() {
       return null;
     }
 
+    if (modoOnline && salaCriada && etapa === "resultado") {
+      return () =>
+        router.replace({
+          pathname: "/sala/[codigo]",
+          params: { codigo: codigoSalaOnline as string },
+        });
+    }
+
     if (!salaCriada) {
       return tipo === "" ? () => setIniciou(false) : voltarParaTipo;
     }
@@ -1862,6 +1929,8 @@ export default function Index() {
     setCarregandoFilmes(false);
     setCarregandoEventos(false);
     setCarregandoReceitas(false);
+
+    router.setParams({ sala: "" });
   }
 
   function renderAcoesDeErro(aoTentar: () => void) {
@@ -1961,6 +2030,14 @@ export default function Index() {
             </Texto>
 
             <Botao titulo="Começar" onPress={() => setIniciou(true)} />
+
+            <View style={styles.espaco} />
+
+            <Botao
+              titulo="Jogar online com amigos"
+              secundario
+              onPress={() => router.push("/salas")}
+            />
           </Tela>
         ) : !salaCriada ? (
           <Tela key="entrada">
@@ -2327,13 +2404,17 @@ export default function Index() {
                     onPress={continuarParaLocalizacao}
                   />
 
-                  <View style={styles.espacoGrande} />
+                  {!modoOnline && (
+                    <>
+                      <View style={styles.espacoGrande} />
 
-                  <Botao
-                    titulo="Girar novamente"
-                    secundario
-                    onPress={escolherAtividade}
-                  />
+                      <Botao
+                        titulo="Girar novamente"
+                        secundario
+                        onPress={escolherAtividade}
+                      />
+                    </>
+                  )}
                 </View>
               ) : etapa === "resultadoModalidade" ? (
                 <View style={styles.blocoResultado}>
