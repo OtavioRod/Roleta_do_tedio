@@ -1,7 +1,8 @@
-import { StyleSheet, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
 import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Opcao<T extends string> = { valor: T; rotulo: string };
 
@@ -35,8 +36,9 @@ export default function SeletorOpcoes<T extends string>({
           const marcada = opcao.valor === valor;
 
           return (
-            <TouchableOpacity
+            <TouchableLibras
               key={opcao.valor}
+              textoTraducao={opcao.rotulo}
               onPress={() => aoEscolher(opcao.valor)}
               activeOpacity={0.7}
               accessibilityRole="radio"
@@ -51,6 +53,7 @@ export default function SeletorOpcoes<T extends string>({
               ]}
             >
               <Texto
+                librasIgnorado
                 style={[
                   styles.texto,
                   { color: marcada ? cores.botaoTexto : cores.texto },
@@ -59,7 +62,7 @@ export default function SeletorOpcoes<T extends string>({
                 {marcada ? "● " : "○ "}
                 {opcao.rotulo}
               </Texto>
-            </TouchableOpacity>
+            </TouchableLibras>
           );
         })}
       </View>

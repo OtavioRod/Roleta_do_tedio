@@ -2,10 +2,11 @@ import { useMemo, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
-  Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+
+import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Filme = {
   id: string;
@@ -72,9 +73,9 @@ export default function ResultadoFilmes({
   return (
     <View style={styles.areaResultado}>
       <View style={styles.container}>
-        <Text style={styles.titulo}>{titulo}</Text>
+        <Texto style={styles.titulo}>{titulo}</Texto>
 
-        <Text style={styles.subtitulo}>{subtitulo}</Text>
+        <Texto style={styles.subtitulo}>{subtitulo}</Texto>
 
         {mostrarCategorias && (
           <ScrollView
@@ -87,8 +88,9 @@ export default function ResultadoFilmes({
               const selecionada = categoriaSelecionada === categoria;
 
               return (
-                <TouchableOpacity
+                <TouchableLibras
                   key={categoria}
+                  textoTraducao={categoria}
                   style={[
                     styles.categoria,
                     selecionada && styles.categoriaSelecionada,
@@ -96,79 +98,89 @@ export default function ResultadoFilmes({
                   onPress={() => setCategoriaSelecionada(categoria)}
                   activeOpacity={0.7}
                 >
-                  <Text
+                  <Texto
+                    librasIgnorado
                     style={[
                       styles.textoCategoria,
                       selecionada && styles.textoCategoriaSelecionada,
                     ]}
                   >
                     {categoria}
-                  </Text>
-                </TouchableOpacity>
+                  </Texto>
+                </TouchableLibras>
               );
             })}
           </ScrollView>
         )}
 
         <View style={styles.filtroContainer}>
-          <Text style={styles.filtroLabel}>Categoria</Text>
+          <Texto style={styles.filtroLabel}>Categoria</Texto>
 
-          <Text style={styles.filtroAtual}>{categoriaSelecionada}</Text>
+          <Texto style={styles.filtroAtual}>{categoriaSelecionada}</Texto>
         </View>
 
         {filmesFiltrados.length === 0 ? (
           <View style={styles.semFilmes}>
-            <Text style={styles.semFilmesTitulo}>Nenhum filme encontrado.</Text>
+            <Texto style={styles.semFilmesTitulo}>
+              Nenhum filme encontrado.
+            </Texto>
 
-            <Text style={styles.semFilmesTexto}>
+            <Texto style={styles.semFilmesTexto}>
               Não encontramos filmes nessa categoria com os dados disponíveis no
               momento.
-            </Text>
+            </Texto>
           </View>
         ) : (
           <View style={styles.lista}>
             {filmesFiltrados.map((filme) => (
               <View key={filme.id} style={styles.card}>
                 <View style={styles.cabecalhoCard}>
-                  <Text style={styles.tituloFilme}>{filme.titulo}</Text>
+                  <Texto style={styles.tituloFilme}>{filme.titulo}</Texto>
 
                   <View style={styles.nota}>
-                    <Text style={styles.notaSimbolo}>★</Text>
+                    <Texto librasIgnorado style={styles.notaSimbolo}>
+                      ★
+                    </Texto>
 
-                    <Text style={styles.notaTexto}>
+                    <Texto style={styles.notaTexto}>
                       {filme.nota > 0 ? filme.nota.toFixed(1) : "N/A"}
-                    </Text>
+                    </Texto>
                   </View>
                 </View>
 
                 <View style={styles.informacoesContainer}>
                   {filme.ano > 0 && (
-                    <Text style={styles.informacao}>{filme.ano}</Text>
+                    <Texto style={styles.informacao}>{filme.ano}</Texto>
                   )}
 
                   {filme.genero && (
-                    <Text style={[styles.informacao, styles.genero]}>
+                    <Texto style={[styles.informacao, styles.genero]}>
                       {filme.genero}
-                    </Text>
+                    </Texto>
                   )}
                 </View>
 
                 {filme.categoria && (
                   <View style={styles.tagCategoria}>
-                    <Text style={styles.categoriaFilme}>{filme.categoria}</Text>
+                    <Texto style={styles.categoriaFilme}>
+                      {filme.categoria}
+                    </Texto>
                   </View>
                 )}
 
-                <Text style={styles.descricao}>{filme.descricao}</Text>
+                <Texto style={styles.descricao}>{filme.descricao}</Texto>
 
                 {onSelecionarFilme && (
-                  <TouchableOpacity
+                  <TouchableLibras
+                    textoTraducao="Escolher este filme"
                     style={styles.botao}
                     onPress={() => onSelecionarFilme(filme)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.textoBotao}>Escolher este filme</Text>
-                  </TouchableOpacity>
+                    <Texto librasIgnorado style={styles.textoBotao}>
+                      Escolher este filme
+                    </Texto>
+                  </TouchableLibras>
                 )}
               </View>
             ))}

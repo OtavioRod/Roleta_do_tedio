@@ -1,7 +1,8 @@
-import { StyleSheet, TouchableOpacity } from "react-native";
+import { StyleSheet } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
 import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type BotaoProps = {
   titulo: string;
@@ -37,7 +38,8 @@ export default function Botao({
       : cores.botaoTexto;
 
   return (
-    <TouchableOpacity
+    <TouchableLibras
+      textoTraducao={rotulo ?? titulo}
       onPress={onPress}
       disabled={desabilitado}
       activeOpacity={0.7}
@@ -53,8 +55,13 @@ export default function Botao({
         },
       ]}
     >
-      <Texto style={[styles.texto, { color: corTexto }]}>{titulo}</Texto>
-    </TouchableOpacity>
+      <Texto
+        librasIgnorado
+        style={[styles.texto, { color: corTexto }]}
+      >
+        {titulo}
+      </Texto>
+    </TouchableLibras>
   );
 }
 

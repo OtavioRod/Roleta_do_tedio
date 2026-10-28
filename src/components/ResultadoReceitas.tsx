@@ -1,4 +1,7 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+
+import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Receita = {
   id: string;
@@ -149,16 +152,16 @@ export default function ResultadoReceitas({
   return (
     <View style={styles.areaResultado}>
       <View style={styles.container}>
-        <Text style={styles.titulo}>{titulo}</Text>
+        <Texto style={styles.titulo}>{titulo}</Texto>
 
-        <Text style={styles.subtitulo}>{subtitulo}</Text>
+        <Texto style={styles.subtitulo}>{subtitulo}</Texto>
 
         {receitas.length === 0 && (
           <View style={styles.avisoFallback}>
-            <Text style={styles.avisoFallbackTexto}>
+            <Texto style={styles.avisoFallbackTexto}>
               Não encontramos receitas externas no momento. Mostrando algumas
               opções disponíveis no aplicativo.
-            </Text>
+            </Texto>
           </View>
         )}
 
@@ -166,53 +169,53 @@ export default function ResultadoReceitas({
           {receitasExibidas.map((receita) => (
             <View key={receita.id} style={styles.card}>
               <View style={styles.cabecalho}>
-                <Text style={styles.nome}>{receita.nome}</Text>
+                <Texto style={styles.nome}>{receita.nome}</Texto>
 
                 {receita.categoria && (
                   <View style={styles.categoria}>
-                    <Text style={styles.textoCategoria}>
+                    <Texto style={styles.textoCategoria}>
                       {receita.categoria}
-                    </Text>
+                    </Texto>
                   </View>
                 )}
               </View>
 
-              <Text style={styles.descricao}>{receita.descricao}</Text>
+              <Texto style={styles.descricao}>{receita.descricao}</Texto>
 
               <View style={styles.informacoes}>
                 <View style={styles.informacaoBloco}>
-                  <Text style={styles.informacaoLabel}>Tempo</Text>
+                  <Texto style={styles.informacaoLabel}>Tempo</Texto>
 
-                  <Text style={styles.informacaoValor}>
+                  <Texto style={styles.informacaoValor}>
                     {receita.tempo} min
-                  </Text>
+                  </Texto>
                 </View>
 
                 <View style={styles.informacaoBloco}>
-                  <Text style={styles.informacaoLabel}>Dificuldade</Text>
+                  <Texto style={styles.informacaoLabel}>Dificuldade</Texto>
 
-                  <Text style={styles.informacaoValor}>
+                  <Texto style={styles.informacaoValor}>
                     {receita.dificuldade}
-                  </Text>
+                  </Texto>
                 </View>
               </View>
 
               <View style={styles.separador} />
 
-              <Text style={styles.subtituloSecao}>Ingredientes</Text>
+              <Texto style={styles.subtituloSecao}>Ingredientes</Texto>
 
               <View style={styles.listaIngredientes}>
                 {receita.ingredientes.map((ingrediente, index) => (
-                  <Text
+                  <Texto
                     key={`${receita.id}-ingrediente-${index}`}
                     style={styles.item}
                   >
                     • {ingrediente}
-                  </Text>
+                  </Texto>
                 ))}
               </View>
 
-              <Text style={styles.subtituloSecao}>Como fazer</Text>
+              <Texto style={styles.subtituloSecao}>Como fazer</Texto>
 
               <View style={styles.listaPreparo}>
                 {receita.preparo.map((passo, index) => (
@@ -221,22 +224,27 @@ export default function ResultadoReceitas({
                     style={styles.passo}
                   >
                     <View style={styles.numeroPasso}>
-                      <Text style={styles.numeroPassoTexto}>{index + 1}</Text>
+                      <Texto style={styles.numeroPassoTexto}>
+                        {index + 1}
+                      </Texto>
                     </View>
 
-                    <Text style={styles.textoPasso}>{passo}</Text>
+                    <Texto style={styles.textoPasso}>{passo}</Texto>
                   </View>
                 ))}
               </View>
 
               {onSelecionarReceita && (
-                <TouchableOpacity
+                <TouchableLibras
+                  textoTraducao="Escolher esta receita"
                   style={styles.botao}
                   onPress={() => onSelecionarReceita(receita)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.textoBotao}>Escolher esta receita</Text>
-                </TouchableOpacity>
+                  <Texto librasIgnorado style={styles.textoBotao}>
+                    Escolher esta receita
+                  </Texto>
+                </TouchableLibras>
               )}
             </View>
           ))}

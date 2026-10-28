@@ -1,4 +1,7 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+
+import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Evento = {
   id: string;
@@ -29,85 +32,88 @@ export default function ResultadoEventos({
   return (
     <View style={styles.areaResultado}>
       <View style={styles.container}>
-        <Text style={styles.titulo}>{titulo}</Text>
+        <Texto style={styles.titulo}>{titulo}</Texto>
 
-        <Text style={styles.subtitulo}>{subtitulo}</Text>
+        <Texto style={styles.subtitulo}>{subtitulo}</Texto>
 
         {eventos.length === 0 ? (
           <View style={styles.semEventos}>
-            <Text style={styles.semEventosTitulo}>
+            <Texto style={styles.semEventosTitulo}>
               Não encontramos eventos no momento.
-            </Text>
+            </Texto>
 
-            <Text style={styles.semEventosTexto}>
+            <Texto style={styles.semEventosTexto}>
               Isso pode acontecer quando não existem eventos cadastrados para a
               região ou quando a fonte de eventos não está disponível.
-            </Text>
+            </Texto>
           </View>
         ) : (
           <View style={styles.lista}>
             {eventos.map((evento) => (
               <View key={evento.id} style={styles.card}>
-                <Text style={styles.nome}>{evento.nome}</Text>
+                <Texto style={styles.nome}>{evento.nome}</Texto>
 
                 {evento.categoria && (
                   <View style={styles.categoria}>
-                    <Text style={styles.textoCategoria}>
+                    <Texto style={styles.textoCategoria}>
                       {evento.categoria}
-                    </Text>
+                    </Texto>
                   </View>
                 )}
 
                 <View style={styles.informacoes}>
                   <View style={styles.informacaoBloco}>
-                    <Text style={styles.informacaoLabel}>Data</Text>
+                    <Texto style={styles.informacaoLabel}>Data</Texto>
 
-                    <Text style={styles.informacao}>{evento.data}</Text>
+                    <Texto style={styles.informacao}>{evento.data}</Texto>
                   </View>
 
                   {evento.horario && (
                     <View style={styles.informacaoBloco}>
-                      <Text style={styles.informacaoLabel}>Horário</Text>
+                      <Texto style={styles.informacaoLabel}>Horário</Texto>
 
-                      <Text style={styles.informacao}>{evento.horario}</Text>
+                      <Texto style={styles.informacao}>{evento.horario}</Texto>
                     </View>
                   )}
 
                   <View style={styles.informacaoBloco}>
-                    <Text style={styles.informacaoLabel}>Local</Text>
+                    <Texto style={styles.informacaoLabel}>Local</Texto>
 
-                    <Text style={styles.informacao}>{evento.local}</Text>
+                    <Texto style={styles.informacao}>{evento.local}</Texto>
                   </View>
 
                   {evento.endereco && (
                     <View style={styles.informacaoBloco}>
-                      <Text style={styles.informacaoLabel}>Endereço</Text>
+                      <Texto style={styles.informacaoLabel}>Endereço</Texto>
 
-                      <Text style={styles.informacao}>{evento.endereco}</Text>
+                      <Texto style={styles.informacao}>{evento.endereco}</Texto>
                     </View>
                   )}
 
                   {evento.preco && (
                     <View style={styles.informacaoBloco}>
-                      <Text style={styles.informacaoLabel}>Preço</Text>
+                      <Texto style={styles.informacaoLabel}>Preço</Texto>
 
-                      <Text style={styles.informacao}>{evento.preco}</Text>
+                      <Texto style={styles.informacao}>{evento.preco}</Texto>
                     </View>
                   )}
                 </View>
 
                 {evento.descricao && (
-                  <Text style={styles.descricao}>{evento.descricao}</Text>
+                  <Texto style={styles.descricao}>{evento.descricao}</Texto>
                 )}
 
                 {onSelecionarEvento && (
-                  <TouchableOpacity
+                  <TouchableLibras
+                    textoTraducao="Escolher este evento"
                     style={styles.botao}
                     onPress={() => onSelecionarEvento(evento)}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.textoBotao}>Escolher este evento</Text>
-                  </TouchableOpacity>
+                    <Texto librasIgnorado style={styles.textoBotao}>
+                      Escolher este evento
+                    </Texto>
+                  </TouchableLibras>
                 )}
               </View>
             ))}

@@ -1,4 +1,7 @@
-import { Text, TouchableOpacity, View } from "react-native";
+import { View } from "react-native";
+
+import Texto from "./Texto";
+import TouchableLibras from "./TouchableLibras";
 
 type Props = {
   nome: string;
@@ -8,11 +11,11 @@ type Props = {
 export default function ParticipanteItem({ nome, onRemover }: Props) {
   return (
     <View>
-      <Text>{nome}</Text>
+      <Texto>{nome}</Texto>
 
-      <TouchableOpacity onPress={onRemover}>
-        <Text>Remover</Text>
-      </TouchableOpacity>
+      <TouchableLibras textoTraducao="Remover" onPress={onRemover}>
+        <Texto librasIgnorado>Remover</Texto>
+      </TouchableLibras>
     </View>
   );
 }
