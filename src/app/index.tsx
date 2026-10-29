@@ -1,6 +1,6 @@
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -25,6 +25,7 @@ import ResultadoFilmes from "../components/ResultadoFilmes";
 import ResultadoJogos from "../components/ResultadoJogos";
 import ResultadoLocais from "../components/ResultadoLocais";
 import ResultadoReceitas from "../components/ResultadoReceitas";
+import RoletaAtividades from "../components/RoletaAtividades";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 
@@ -70,6 +71,7 @@ type Etapa =
   | "tempo"
   | "tempoEscolhido"
   | "resumo"
+  | "girando"
   | "resultado"
   | "resultadoModalidade"
   | "resultadoFilmes"
@@ -119,37 +121,37 @@ const OPCOES_GASTO: {
   rotulo: string;
   categoria: Gasto;
 }[] = [
-  {
-    valor: "R$ 0",
-    botao: "R$ 0 — Hoje não sai dinheiro",
-    rotulo: "R$ 0",
-    categoria: "nada",
-  },
-  {
-    valor: "até 30",
-    botao: "Até R$ 30",
-    rotulo: "Até R$ 30",
-    categoria: "pouco",
-  },
-  {
-    valor: "até 60",
-    botao: "Até R$ 60",
-    rotulo: "Até R$ 60",
-    categoria: "medio",
-  },
-  {
-    valor: "até 100",
-    botao: "Até R$ 100",
-    rotulo: "Até R$ 100",
-    categoria: "livre",
-  },
-  {
-    valor: "sem limite",
-    botao: "Hoje eu posso gastar",
-    rotulo: "Sem limite",
-    categoria: "livre",
-  },
-];
+    {
+      valor: "R$ 0",
+      botao: "R$ 0 — Hoje não sai dinheiro",
+      rotulo: "R$ 0",
+      categoria: "nada",
+    },
+    {
+      valor: "até 30",
+      botao: "Até R$ 30",
+      rotulo: "Até R$ 30",
+      categoria: "pouco",
+    },
+    {
+      valor: "até 60",
+      botao: "Até R$ 60",
+      rotulo: "Até R$ 60",
+      categoria: "medio",
+    },
+    {
+      valor: "até 100",
+      botao: "Até R$ 100",
+      rotulo: "Até R$ 100",
+      categoria: "livre",
+    },
+    {
+      valor: "sem limite",
+      botao: "Hoje eu posso gastar",
+      rotulo: "Sem limite",
+      categoria: "livre",
+    },
+  ];
 
 const OPCOES_DISPOSICAO: { valor: Disposicao; rotulo: string }[] = [
   { valor: "baixa", rotulo: "Pouca disposição" },
@@ -209,6 +211,7 @@ const ANUNCIO_ETAPA: Record<Etapa, string> = {
   tempo: "Pergunta: quanto tempo você tem?",
   tempoEscolhido: "Resposta registrada.",
   resumo: "Resumo das respostas.",
+  girando: "A roleta está girando para escolher uma atividade.",
   resultado: "A roleta decidiu.",
   resultadoModalidade: "Resultado do café.",
   resultadoFilmes: "Lista de filmes.",
@@ -586,7 +589,8 @@ function Carregando({ texto, grande }: CarregandoProps) {
 
 export default function Index() {
   const { cores } = usePreferencias();
-  const { executarSemExpirar } = useSessao();
+  const { executarSemExpirar, usuario, perfil } = useSessao();
+  //const { executarSemExpirar } = useSessao();
 
   const router = useRouter();
 
@@ -602,6 +606,7 @@ export default function Index() {
   const [etapa, setEtapa] = useState<Etapa>("sala");
 
   const [nomeParticipante, setNomeParticipante] = useState("");
+  const nomeParticipanteEditado = useRef(false);
 
   const [participantes, setParticipantes] = useState<Participante[]>([]);
 
@@ -654,8 +659,25 @@ export default function Index() {
   const [permissaoNegada, setPermissaoNegada] = useState(false);
 
   const execucaoId = useRef(0);
+  const girandoRef = useRef(false);
 
   const acaoVoltarRef = useRef<(() => void) | null>(null);
+  const nomeConta = perfil?.nome || usuario?.displayName || "";
+
+  const concluirGiro = useCallback(() => {
+    if (!girandoRef.current) {
+      return;
+    }
+
+    girandoRef.current = false;
+    setEtapa("resultado");
+  }, []);
+
+  useEffect(() => {
+    if (nomeConta && !nomeParticipanteEditado.current) {
+      setNomeParticipante(nomeConta);
+    }
+  }, [nomeConta]);
 
   useEffect(() => {
     if (!iniciou || !salaCriada) {
@@ -1022,6 +1044,10 @@ export default function Index() {
   }
 
   function escolherAtividade() {
+    if (girandoRef.current) {
+      return;
+    }
+
     setErroApi("");
     setModalidadeEscolhida(null);
 
@@ -1056,7 +1082,8 @@ export default function Index() {
     }
 
     setAtividadeEscolhida(escolhida);
-    setEtapa("resultado");
+    girandoRef.current = true;
+    setEtapa("girando");
 
     salvarSessaoSemBloquear(escolhida.nome, tipo);
   }
@@ -1888,6 +1915,12 @@ export default function Index() {
       case "resumo":
         return voltarDoResumo;
 
+      case "girando":
+        return () => {
+          girandoRef.current = false;
+          setEtapa("resumo");
+        };
+
       case "resultado":
         return () => setEtapa("resumo");
 
@@ -1898,13 +1931,15 @@ export default function Index() {
 
   function reiniciar() {
     execucaoId.current += 1;
+    girandoRef.current = false;
 
     setIniciou(false);
     setTipo("");
     setSalaCriada(false);
     setCodigoSala("");
     setEtapa("sala");
-    setNomeParticipante("");
+    nomeParticipanteEditado.current = false;
+    setNomeParticipante(nomeConta);
     setParticipantes([]);
     setParticipanteAtual(0);
     setAtividadeEscolhida(null);
@@ -2068,7 +2103,10 @@ export default function Index() {
 
                 <CampoTexto
                   valor={nomeParticipante}
-                  aoMudar={setNomeParticipante}
+                  aoMudar={(valor) => {
+                    nomeParticipanteEditado.current = true;
+                    setNomeParticipante(valor);
+                  }}
                   aoEnviar={criarSala}
                   placeholder="Digite seu nome"
                   rotulo="Seu nome"
@@ -2353,6 +2391,12 @@ export default function Index() {
               dica="Sorteia uma atividade com base nas respostas de todos"
             />
           </Tela>
+        ) : etapa === "girando" && atividadeEscolhida ? (
+          <RoletaAtividades
+            atividades={atividades}
+            selecionada={atividadeEscolhida}
+            aoConcluir={concluirGiro}
+          />
         ) : telaDeResultado ? (
           <ScrollView
             style={styles.resultadoScroll}
