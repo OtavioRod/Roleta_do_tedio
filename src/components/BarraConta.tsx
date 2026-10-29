@@ -15,7 +15,7 @@ export default function BarraConta() {
 
   const nome = perfil?.nome || usuario?.displayName || usuario?.email || "";
 
-  const podeVerPerfil = emailOk && permissoesConcluidas;
+  const liberado = emailOk && permissoesConcluidas;
 
   return (
     <View
@@ -28,15 +28,26 @@ export default function BarraConta() {
         Olá, {nome}
       </Texto>
 
-      {podeVerPerfil && (
-        <View style={styles.acao}>
-          <Botao
-            titulo="Perfil"
-            secundario
-            dica="Mostra os dados da sua conta e da sessão"
-            onPress={() => router.push("/perfil")}
-          />
-        </View>
+      {liberado && (
+        <>
+          <View style={styles.acao}>
+            <Botao
+              titulo="Salas"
+              secundario
+              dica="Cria uma sala online ou entra em uma"
+              onPress={() => router.push("/salas")}
+            />
+          </View>
+
+          <View style={styles.acao}>
+            <Botao
+              titulo="Perfil"
+              secundario
+              dica="Mostra os dados da sua conta e da sessão"
+              onPress={() => router.push("/perfil")}
+            />
+          </View>
+        </>
       )}
 
       <View style={styles.acao}>
@@ -50,6 +61,7 @@ const styles = StyleSheet.create({
   barra: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
@@ -58,11 +70,12 @@ const styles = StyleSheet.create({
 
   nome: {
     flex: 1,
+    minWidth: 100,
     fontSize: 15,
     fontWeight: "600",
   },
 
   acao: {
-    minWidth: 84,
+    minWidth: 76,
   },
 });

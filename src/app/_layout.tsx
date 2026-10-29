@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import AvisoConvite from "@/components/AvisoConvite";
 import AvisoSessao from "@/components/AvisoSessao";
 import BarraConta from "@/components/BarraConta";
 import PainelAcessibilidade from "@/components/PainelAcessibilidade";
@@ -63,6 +64,9 @@ function Conteudo() {
                     <Stack.Screen name="index" />
                     <Stack.Screen name="perfil" />
                   </Stack.Protected>
+                  <AvisoConvite />
+
+                  <PainelAcessibilidade />
 
                   <Stack.Protected guard={liberado}>
                     <Stack.Screen name="permissoes" />
