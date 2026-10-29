@@ -123,3 +123,30 @@ export async function pedirNotificacoes(): Promise<EstadoPermissao> {
     return "indisponivel";
   }
 }
+export async function exibirNotificacaoLocal(titulo: string, corpo: string) {
+  if (Platform.OS === "web") {
+    if (
+      typeof Notification !== "undefined" &&
+      Notification.permission === "granted"
+    ) {
+      new Notification(titulo, { body: corpo });
+    }
+
+    return;
+  }
+
+  const modulo = await carregarNotificacoes();
+
+  if (!modulo) {
+    return;
+  }
+
+  try {
+    await modulo.scheduleNotificationAsync({
+      content: { title: titulo, body: corpo },
+      trigger: null,
+    });
+  } catch (erro) {
+    console.warn("Não foi possível exibir a notificação:", erro);
+  }
+}
