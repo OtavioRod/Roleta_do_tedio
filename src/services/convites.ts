@@ -1,15 +1,15 @@
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    onSnapshot,
-    query,
-    serverTimestamp,
-    setDoc,
-    Unsubscribe,
-    updateDoc,
-    where,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  Unsubscribe,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 
 import { obterFirestore } from "./firebase";
@@ -33,14 +33,20 @@ export async function enviarConvite(
     `${sala.codigo}_${para.uid}`,
   );
 
-  const existente = await getDoc(referencia);
+  try {
+    const existente = await getDoc(referencia);
 
-  if (existente.exists()) {
-    if (existente.data().estado === "pendente") {
+    if (existente.exists() && existente.data().estado === "pendente") {
       return "ja-enviado";
     }
+  } catch {
+    // sem permissão para ler um convite que não existe: segue e cria
+  }
 
+  try {
     await deleteDoc(referencia);
+  } catch {
+    // não existia ou já foi respondido: o setDoc abaixo recria o convite
   }
 
   await setDoc(referencia, {

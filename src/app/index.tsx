@@ -43,8 +43,10 @@ import {
 import { salvarSessao } from "../services/backend";
 import { buscarEventos, Evento } from "../services/eventos";
 import { buscarFilmes, Filme } from "../services/filmes";
+import { notificar } from "../services/notificar";
 import { buscarReceitas, Receita } from "../services/receitas";
 import { carregarSalaParaResultado } from "../services/salas";
+import { tocarSom } from "../services/sons";
 
 const VELOCIDADE_DIGITACAO = 18;
 
@@ -121,37 +123,37 @@ const OPCOES_GASTO: {
   rotulo: string;
   categoria: Gasto;
 }[] = [
-    {
-      valor: "R$ 0",
-      botao: "R$ 0 — Hoje não sai dinheiro",
-      rotulo: "R$ 0",
-      categoria: "nada",
-    },
-    {
-      valor: "até 30",
-      botao: "Até R$ 30",
-      rotulo: "Até R$ 30",
-      categoria: "pouco",
-    },
-    {
-      valor: "até 60",
-      botao: "Até R$ 60",
-      rotulo: "Até R$ 60",
-      categoria: "medio",
-    },
-    {
-      valor: "até 100",
-      botao: "Até R$ 100",
-      rotulo: "Até R$ 100",
-      categoria: "livre",
-    },
-    {
-      valor: "sem limite",
-      botao: "Hoje eu posso gastar",
-      rotulo: "Sem limite",
-      categoria: "livre",
-    },
-  ];
+  {
+    valor: "R$ 0",
+    botao: "R$ 0 — Hoje não sai dinheiro",
+    rotulo: "R$ 0",
+    categoria: "nada",
+  },
+  {
+    valor: "até 30",
+    botao: "Até R$ 30",
+    rotulo: "Até R$ 30",
+    categoria: "pouco",
+  },
+  {
+    valor: "até 60",
+    botao: "Até R$ 60",
+    rotulo: "Até R$ 60",
+    categoria: "medio",
+  },
+  {
+    valor: "até 100",
+    botao: "Até R$ 100",
+    rotulo: "Até R$ 100",
+    categoria: "livre",
+  },
+  {
+    valor: "sem limite",
+    botao: "Hoje eu posso gastar",
+    rotulo: "Sem limite",
+    categoria: "livre",
+  },
+];
 
 const OPCOES_DISPOSICAO: { valor: Disposicao; rotulo: string }[] = [
   { valor: "baixa", rotulo: "Pouca disposição" },
@@ -498,6 +500,10 @@ function PerguntaAnimada({
   const atrasoDescricaoMenor =
     atrasoDescricao + (descricao?.length ?? 0) * VELOCIDADE_DIGITACAO;
 
+  useEffect(() => {
+    tocarSom("pergunta");
+  }, [titulo]);
+
   return (
     <>
       <TextoDigitado cabecalho texto={titulo} estilo={styles.titulo} />
@@ -672,6 +678,22 @@ export default function Index() {
     girandoRef.current = false;
     setEtapa("resultado");
   }, []);
+
+  const etapaAnterior = useRef<Etapa>(etapa);
+
+  useEffect(() => {
+    const anterior = etapaAnterior.current;
+
+    etapaAnterior.current = etapa;
+
+    if (anterior === "girando" && etapa === "resultado" && atividadeEscolhida) {
+      notificar({
+        titulo: "A roleta decidiu!",
+        texto: atividadeEscolhida.nome,
+        som: "nenhum",
+      });
+    }
+  }, [etapa, atividadeEscolhida]);
 
   useEffect(() => {
     if (nomeConta && !nomeParticipanteEditado.current) {

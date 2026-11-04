@@ -39,6 +39,35 @@ async function carregarNotificacoes() {
   }
 }
 
+let comportamentoConfigurado = false;
+
+export async function configurarNotificacoes() {
+  if (Platform.OS === "web" || comportamentoConfigurado) {
+    return;
+  }
+
+  const modulo = await carregarNotificacoes();
+
+  if (!modulo) {
+    return;
+  }
+
+  try {
+    modulo.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+
+    comportamentoConfigurado = true;
+  } catch (erro) {
+    console.warn("Não foi possível configurar as notificações:", erro);
+  }
+}
+
 export async function estadoLocalizacao(): Promise<EstadoPermissao> {
   try {
     const resposta = await Location.getForegroundPermissionsAsync();

@@ -10,8 +10,9 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
-import Texto from "./Texto";
 import { Atividade } from "../data/atividades";
+import { pararSom, tocarSom } from "../services/sons";
+import Texto from "./Texto";
 
 const TAMANHO = 300;
 const CENTRO = TAMANHO / 2;
@@ -47,6 +48,7 @@ type RoletaAtividadesProps = {
   atividades: Atividade[];
   selecionada: Atividade;
   aoConcluir: () => void;
+  posicaoFixa?: number;
 };
 
 function pontoNoCirculo(angulo: number, raio: number) {
@@ -70,10 +72,12 @@ export default function RoletaAtividades({
   atividades,
   selecionada,
   aoConcluir,
+  posicaoFixa,
 }: RoletaAtividadesProps) {
   const [parada, setParada] = useState(false);
-  const temporizadorResultado =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const temporizadorResultado = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const rotacao = useSharedValue(0);
   const estiloRotacao = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotacao.value}deg` }],
@@ -85,15 +89,9 @@ export default function RoletaAtividades({
       (atividade) => (ROTULOS[atividade.id] ?? atividade.nome).length,
     ),
   );
-  const espacoRadial = Math.min(
-    raioRotulo - 30,
-    RAIO - raioRotulo - 8,
-  ) * 2;
+  const espacoRadial = Math.min(raioRotulo - 30, RAIO - raioRotulo - 8) * 2;
   const espacoTangencial =
-    raioRotulo *
-    2 *
-    Math.sin(Math.PI / Math.max(atividades.length, 1)) *
-    0.8;
+    raioRotulo * 2 * Math.sin(Math.PI / Math.max(atividades.length, 1)) * 0.8;
   const tamanhoFonteRotulo = Math.max(
     1,
     Math.floor(
@@ -103,6 +101,8 @@ export default function RoletaAtividades({
 
   const concluirDepoisDoResultado = useCallback(() => {
     setParada(true);
+    pararSom("roleta");
+    tocarSom("resultado");
     temporizadorResultado.current = setTimeout(
       aoConcluir,
       DURACAO_RESULTADO_MS,
@@ -121,9 +121,11 @@ export default function RoletaAtividades({
     const anguloFatia = 360 / atividades.length;
     const margem = anguloFatia * MARGEM_DA_FATIA;
     const posicaoNaFatia =
-      Math.random() * (anguloFatia - margem * 2) + margem;
+      (posicaoFixa ?? Math.random()) * (anguloFatia - margem * 2) + margem;
     const anguloSelecionado = -90 + indice * anguloFatia + posicaoNaFatia;
     const rotacaoFinal = 360 * VOLTAS_COMPLETAS - anguloSelecionado;
+
+    tocarSom("roleta");
 
     rotacao.value = withTiming(
       rotacaoFinal,
@@ -140,6 +142,7 @@ export default function RoletaAtividades({
 
     return () => {
       cancelAnimation(rotacao);
+      pararSom("roleta");
 
       if (temporizadorResultado.current !== null) {
         clearTimeout(temporizadorResultado.current);
@@ -148,6 +151,7 @@ export default function RoletaAtividades({
   }, [
     atividades,
     concluirDepoisDoResultado,
+    posicaoFixa,
     rotacao,
     selecionada.id,
     temporizadorResultado,

@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
+import { tocarSom } from "../services/sons";
 import Texto from "./Texto";
 import TouchableLibras from "./TouchableLibras";
 
@@ -12,6 +13,7 @@ type BotaoProps = {
   secundario?: boolean;
   rotulo?: string;
   dica?: string;
+  semSom?: boolean;
 };
 
 export default function Botao({
@@ -22,6 +24,7 @@ export default function Botao({
   secundario = false,
   rotulo,
   dica,
+  semSom = false,
 }: BotaoProps) {
   const { cores } = usePreferencias();
 
@@ -40,7 +43,13 @@ export default function Botao({
   return (
     <TouchableLibras
       textoTraducao={rotulo ?? titulo}
-      onPress={onPress}
+      onPress={() => {
+        if (!semSom) {
+          tocarSom("clique");
+        }
+
+        onPress();
+      }}
       disabled={desabilitado}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -55,10 +64,7 @@ export default function Botao({
         },
       ]}
     >
-      <Texto
-        librasIgnorado
-        style={[styles.texto, { color: corTexto }]}
-      >
+      <Texto librasIgnorado style={[styles.texto, { color: corTexto }]}>
         {titulo}
       </Texto>
     </TouchableLibras>

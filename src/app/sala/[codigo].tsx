@@ -3,39 +3,37 @@ import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../../components/Botao";
-import SeletorOpcoes from "../../components/SeletorOpcoes";
+import PerguntasRoleta from "../../components/PerguntasRoleta";
+import RoletaAtividades from "../../components/RoletaAtividades";
 import Texto from "../../components/Texto";
-import {
-    Disposicao,
-    GastoOpcao,
-    Humor,
-    OPCOES_DISPOSICAO,
-    OPCOES_GASTO,
-    OPCOES_HUMOR,
-    OPCOES_TEMPO,
-    TempoOpcao,
-} from "../../constants/opcoesRoleta";
 import { usePreferencias } from "../../context/PreferenciasContext";
 import { useSessao } from "../../context/SessaoContext";
 import { atividades } from "../../data/atividades";
 import { Amizade, observarAmizades } from "../../services/amigos";
 import { enviarConvite } from "../../services/convites";
+import { notificar } from "../../services/notificar";
 import {
-    criarSala as _criarSalaNaoUsada,
-    definirResultado,
-    entrarNaSala,
-    enviarRespostas,
-    iniciarRodada,
-    MembroSala,
-    observarMembros,
-    observarSala,
-    sairDaSala,
-    Sala,
+  criarSala as _criarSalaNaoUsada,
+  definirResultado,
+  entrarNaSala,
+  enviarProgresso,
+  enviarRespostas,
+  iniciarRodada,
+  MembroSala,
+  observarMembros,
+  observarSala,
+  Respostas,
+  sairDaSala,
+  Sala,
 } from "../../services/salas";
+import { tocarSom } from "../../services/sons";
 import { normalizarCodigo } from "../../utils/codigos";
 import { compartilharTexto } from "../../utils/compartilhar";
 import { mensagemErroSocial } from "../../utils/mensagensSociais";
-import { escolherAtividadeDoGrupo } from "../../utils/recomendacao";
+import {
+  criarSorteioDeterministico,
+  escolherAtividadeDoGrupo,
+} from "../../utils/recomendacao";
 
 void _criarSalaNaoUsada;
 
@@ -60,15 +58,16 @@ export default function TelaSala() {
   const [membros, setMembros] = useState<MembroSala[]>([]);
   const [amizades, setAmizades] = useState<Amizade[]>([]);
   const [convidados, setConvidados] = useState<Record<string, string>>({});
-  const [humor, setHumor] = useState<Humor | "">("");
-  const [gasto, setGasto] = useState<GastoOpcao | "">("");
-  const [disposicao, setDisposicao] = useState<Disposicao | "">("");
-  const [tempo, setTempo] = useState<TempoOpcao | "">("");
   const [mensagem, setMensagem] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
 
+  const [girando, setGirando] = useState(false);
+
   const calculando = useRef(false);
+  const estadoAnterior = useRef<string | null>(null);
+  const membrosVistos = useRef<Map<string, string> | null>(null);
+  const prontosAnteriores = useRef(0);
 
   const souMembro = Boolean(sala && sala.membrosUids.includes(uid));
   const souDono = Boolean(sala && sala.donoUid === uid);
@@ -105,15 +104,54 @@ export default function TelaSala() {
   }, [uid]);
 
   useEffect(() => {
-    setHumor("");
-    setGasto("");
-    setDisposicao("");
-    setTempo("");
-  }, [sala?.rodada]);
+    if (!sala) {
+      return;
+    }
+
+    const anterior = estadoAnterior.current;
+
+    estadoAnterior.current = sala.estado;
+
+    if (anterior === null || anterior === sala.estado) {
+      return;
+    }
+
+    if (sala.estado === "respondendo") {
+      setGirando(false);
+
+      if (!souDono) {
+        notificar({
+          titulo: "A rodada começou!",
+          texto: "Responda às perguntas para a roleta decidir.",
+          som: "convite",
+        });
+      }
+    }
+
+    if (sala.estado === "resultado") {
+      setGirando(true);
+
+      notificar({
+        titulo: "A roleta vai girar!",
+        texto: "Volte ao app para ver a atividade escolhida.",
+        som: "nenhum",
+        quando: "segundoPlano",
+      });
+    }
+
+    if (sala.estado === "encerrada" && !souDono) {
+      notificar({
+        titulo: "A sala foi encerrada",
+        texto: `${sala.donoNome} encerrou a sala ${sala.codigo}.`,
+        som: "notificacao",
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sala?.estado]);
 
   useEffect(() => {
-    if (!sala || !souDono || sala.estado !== "respondendo") {
-      calculando.current = false;
+    if (!sala || !souMembro) {
+      membrosVistos.current = null;
 
       return;
     }
@@ -122,32 +160,119 @@ export default function TelaSala() {
       return;
     }
 
+    const atuais = new Map<string, string>();
+
+    for (const membro of membros) {
+      atuais.set(membro.uid, membro.nome);
+    }
+
+    const antes = membrosVistos.current;
+
+    membrosVistos.current = atuais;
+
+    if (antes === null) {
+      return;
+    }
+
+    atuais.forEach((membroNome, membroUid) => {
+      if (!antes.has(membroUid) && membroUid !== uid) {
+        notificar({
+          titulo: `${membroNome || "Alguém"} entrou na sala`,
+          texto: `${atuais.size} de ${sala.limite} pessoas na sala.`,
+          som: "entrou",
+        });
+      }
+    });
+
+    antes.forEach((membroNome, membroUid) => {
+      if (!atuais.has(membroUid) && membroUid !== uid) {
+        notificar({
+          titulo: `${membroNome || "Alguém"} saiu da sala`,
+          som: "notificacao",
+        });
+      }
+    });
+  }, [sala, membros, souMembro, uid]);
+
+  useEffect(() => {
+    if (!sala || sala.estado !== "respondendo") {
+      prontosAnteriores.current = 0;
+
+      return;
+    }
+
+    const quantidade = membros.filter(
+      (membro) => membro.respostas !== null && membro.rodada === sala.rodada,
+    ).length;
+
+    if (quantidade > prontosAnteriores.current) {
+      tocarSom("entrou");
+    }
+
+    prontosAnteriores.current = quantidade;
+  }, [sala, membros]);
+
+  useEffect(() => {
+    if (!sala || !souMembro || sala.estado !== "respondendo") {
+      calculando.current = false;
+
+      return undefined;
+    }
+
+    if (membros.length === 0 || membros.length !== sala.membrosUids.length) {
+      return undefined;
+    }
+
     const todosProntos = membros.every(
       (membro) => membro.respostas !== null && membro.rodada === sala.rodada,
     );
 
     if (!todosProntos || calculando.current) {
-      return;
+      return undefined;
     }
 
-    calculando.current = true;
+    const calcular = () => {
+      calculando.current = true;
 
-    const participantes = membros.map((membro) => ({
-      nome: membro.nome,
-      ...membro.respostas!,
-    }));
+      const participantes = [...membros]
+        .sort((a, b) => (a.uid < b.uid ? -1 : 1))
+        .map((membro) => ({
+          nome: membro.nome,
+          ...membro.respostas!,
+        }));
 
-    const { atividade, semFiltro } = escolherAtividadeDoGrupo(participantes);
+      const sorteio = criarSorteioDeterministico(
+        `${sala.codigo}-${sala.rodada}`,
+      );
 
-    definirResultado(sala.codigo, {
-      atividadeId: atividade.id,
-      atividadeNome: atividade.nome,
-      semFiltro,
-    }).catch((falha) => {
-      calculando.current = false;
-      setErro(mensagemErroSocial(falha));
-    });
-  }, [sala, membros, souDono]);
+      const { atividade, semFiltro } = escolherAtividadeDoGrupo(
+        participantes,
+        sorteio,
+      );
+
+      definirResultado(sala.codigo, {
+        atividadeId: atividade.id,
+        atividadeNome: atividade.nome,
+        semFiltro,
+      }).catch((falha) => {
+        calculando.current = false;
+
+        if (souDono) {
+          setErro(mensagemErroSocial(falha));
+        }
+      });
+    };
+
+    if (souDono) {
+      calcular();
+
+      return undefined;
+    }
+
+    const reserva = setTimeout(calcular, 4000);
+
+    return () => clearTimeout(reserva);
+  }, [sala, membros, souDono, souMembro]);
 
   async function executar(acao: () => Promise<void>) {
     setOcupado(true);
@@ -226,25 +351,21 @@ export default function TelaSala() {
     executar(() => iniciarRodada(sala.codigo, sala.rodada));
   }
 
-  function enviar() {
-    if (
-      !sala ||
-      humor === "" ||
-      gasto === "" ||
-      disposicao === "" ||
-      tempo === ""
-    ) {
-      setErro("Responda as quatro perguntas.");
+  function finalizarRespostas(respostas: Respostas) {
+    if (!sala) {
       return;
     }
 
-    executar(() =>
-      enviarRespostas(sala.codigo, uid, sala.rodada, {
-        humor,
-        gasto,
-        disposicao,
-        tempo,
-      }),
+    executar(() => enviarRespostas(sala.codigo, uid, sala.rodada, respostas));
+  }
+
+  function registrarProgresso(perguntasRespondidas: number) {
+    if (!sala) {
+      return;
+    }
+
+    enviarProgresso(sala.codigo, uid, sala.rodada, perguntasRespondidas).catch(
+      () => undefined,
     );
   }
 
@@ -373,6 +494,35 @@ export default function TelaSala() {
     ? atividades.find((item) => item.id === sala.resultado?.atividadeId)
     : undefined;
 
+  if (sala.estado === "respondendo" && !jaRespondi) {
+    return (
+      <PerguntasRoleta
+        key={`perguntas-${sala.rodada}`}
+        nome={nome}
+        enviando={ocupado}
+        erro={erro}
+        aoProgresso={registrarProgresso}
+        aoFinalizar={finalizarRespostas}
+        aoSair={sair}
+      />
+    );
+  }
+
+  if (girando && sala.estado === "resultado" && atividade) {
+    return (
+      <View style={styles.areaRoleta}>
+        <RoletaAtividades
+          atividades={atividades}
+          selecionada={atividade}
+          posicaoFixa={criarSorteioDeterministico(
+            `posicao-${sala.codigo}-${sala.rodada}`,
+          )()}
+          aoConcluir={() => setGirando(false)}
+        />
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       contentContainerStyle={styles.conteudo}
@@ -418,7 +568,13 @@ export default function TelaSala() {
 
               {sala.estado === "respondendo" && (
                 <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
-                  {respondeu ? "Respondeu" : "Respondendo..."}
+                  {respondeu
+                    ? "Respondeu ✓"
+                    : membro &&
+                        membro.progressoRodada === sala.rodada &&
+                        membro.progresso > 0
+                      ? `Respondendo... pergunta ${Math.min(membro.progresso + 1, 4)} de 4`
+                      : "Respondendo..."}
                 </Texto>
               )}
             </View>
@@ -516,48 +672,6 @@ export default function TelaSala() {
           </>
         )}
 
-        {sala.estado === "respondendo" && !jaRespondi && (
-          <>
-            <Texto cabecalho style={styles.secao}>
-              Suas respostas
-            </Texto>
-
-            <SeletorOpcoes
-              rotulo="Como você está agora?"
-              opcoes={OPCOES_HUMOR}
-              valor={humor}
-              aoEscolher={setHumor}
-            />
-
-            <SeletorOpcoes
-              rotulo="Quanto você pretende gastar?"
-              opcoes={OPCOES_GASTO}
-              valor={gasto}
-              aoEscolher={setGasto}
-            />
-
-            <SeletorOpcoes
-              rotulo="Qual é a sua disposição?"
-              opcoes={OPCOES_DISPOSICAO}
-              valor={disposicao}
-              aoEscolher={setDisposicao}
-            />
-
-            <SeletorOpcoes
-              rotulo="Quanto tempo você tem?"
-              opcoes={OPCOES_TEMPO}
-              valor={tempo}
-              aoEscolher={setTempo}
-            />
-
-            <Botao
-              titulo="Enviar minhas respostas"
-              onPress={enviar}
-              desabilitado={ocupado}
-            />
-          </>
-        )}
-
         {sala.estado === "respondendo" && jaRespondi && (
           <Texto
             accessibilityLiveRegion="polite"
@@ -650,6 +764,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     alignSelf: "center",
+  },
+
+  areaRoleta: {
+    flex: 1,
+    width: "100%",
   },
 
   centro: {

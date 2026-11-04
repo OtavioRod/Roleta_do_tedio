@@ -54,7 +54,8 @@
           "faceIDPermission": "Usar Face ID para confirmar sua entrada na Roleta do Tédio."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-audio"
     ],
     "extra": {
       "router": {},
