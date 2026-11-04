@@ -5,6 +5,9 @@ import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AvisoConvite from "@/components/AvisoConvite";
+import AvisoNotificacao, {
+  NotificadorSocial,
+} from "@/components/AvisoNotificacao";
 import AvisoSessao from "@/components/AvisoSessao";
 import BarraConta from "@/components/BarraConta";
 import PainelAcessibilidade from "@/components/PainelAcessibilidade";
@@ -17,17 +20,27 @@ import {
 } from "@/context/PreferenciasContext";
 import { SessaoProvider, useSessao } from "@/context/SessaoContext";
 import { acordarBackend } from "@/services/acordarBackend";
+import { definirSistemaPermitido } from "@/services/notificar";
+import { configurarNotificacoes } from "@/services/permissoes";
 
 SplashScreen.preventAutoHideAsync();
 
 function Conteudo() {
   const { tema, cores } = usePreferencias();
 
-  const { carregando, usuario, emailOk, permissoesConcluidas } = useSessao();
+  const { carregando, usuario, perfil, emailOk, permissoesConcluidas } =
+    useSessao();
 
   useEffect(() => {
     acordarBackend();
+    configurarNotificacoes().catch(() => undefined);
   }, []);
+
+  const permitePush = perfil?.notificacoes.push === true;
+
+  useEffect(() => {
+    definirSistemaPermitido(permitePush);
+  }, [permitePush]);
 
   const autenticado = !!usuario;
 
@@ -63,10 +76,10 @@ function Conteudo() {
                   <Stack.Protected guard={liberado && permissoesConcluidas}>
                     <Stack.Screen name="index" />
                     <Stack.Screen name="perfil" />
+                    <Stack.Screen name="salas" />
+                    <Stack.Screen name="amigos" />
+                    <Stack.Screen name="sala/[codigo]" />
                   </Stack.Protected>
-                  <AvisoConvite />
-
-                  <PainelAcessibilidade />
 
                   <Stack.Protected guard={liberado}>
                     <Stack.Screen name="permissoes" />
@@ -86,6 +99,12 @@ function Conteudo() {
           )}
 
           <PainelAcessibilidade />
+
+          <AvisoConvite />
+
+          <NotificadorSocial />
+
+          <AvisoNotificacao />
 
           <AvisoSessao />
         </View>

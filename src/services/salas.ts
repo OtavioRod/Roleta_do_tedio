@@ -1,27 +1,27 @@
 import {
-    arrayRemove,
-    arrayUnion,
-    collection,
-    doc,
-    DocumentData,
-    getDoc,
-    getDocs,
-    onSnapshot,
-    serverTimestamp,
-    Unsubscribe,
-    updateDoc,
-    writeBatch,
+  arrayRemove,
+  arrayUnion,
+  collection,
+  doc,
+  DocumentData,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  serverTimestamp,
+  Unsubscribe,
+  updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 
 import {
-    Disposicao,
-    GastoOpcao,
-    Humor,
-    OPCOES_DISPOSICAO,
-    OPCOES_GASTO,
-    OPCOES_HUMOR,
-    OPCOES_TEMPO,
-    TempoOpcao,
+  Disposicao,
+  GastoOpcao,
+  Humor,
+  OPCOES_DISPOSICAO,
+  OPCOES_GASTO,
+  OPCOES_HUMOR,
+  OPCOES_TEMPO,
+  TempoOpcao,
 } from "../constants/opcoesRoleta";
 import { gerarCodigo, normalizarCodigo } from "../utils/codigos";
 import { obterFirestore } from "./firebase";
@@ -64,6 +64,8 @@ export type MembroSala = {
   nome: string;
   rodada: number;
   respostas: Respostas | null;
+  progresso: number;
+  progressoRodada: number;
 };
 
 export type Usuario = {
@@ -135,6 +137,8 @@ function converterMembro(uid: string, dados: DocumentData): MembroSala {
     nome: String(dados.nome ?? ""),
     rodada: Number(dados.rodada) || 0,
     respostas: converterRespostas(dados.respostas),
+    progresso: Number(dados.progresso) || 0,
+    progressoRodada: Number(dados.progressoRodada) || 0,
   };
 }
 
@@ -308,6 +312,18 @@ export async function enviarRespostas(
   await updateDoc(doc(obterFirestore(), "salas", codigo, "membros", uid), {
     respostas,
     rodada,
+  });
+}
+
+export async function enviarProgresso(
+  codigo: string,
+  uid: string,
+  rodada: number,
+  perguntasRespondidas: number,
+) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo, "membros", uid), {
+    progresso: perguntasRespondidas,
+    progressoRodada: rodada,
   });
 }
 

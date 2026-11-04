@@ -1,10 +1,10 @@
 import {
-    Disposicao,
-    GastoOpcao,
-    Humor,
-    OPCOES_GASTO,
-    OPCOES_TEMPO,
-    TempoOpcao,
+  Disposicao,
+  GastoOpcao,
+  Humor,
+  OPCOES_GASTO,
+  OPCOES_TEMPO,
+  TempoOpcao,
 } from "../constants/opcoesRoleta";
 import { Atividade, atividades, Gasto } from "../data/atividades";
 
@@ -158,5 +158,22 @@ export function escolherAtividadeDoGrupo(
   return {
     atividade: melhores[Math.floor(sorteio() * melhores.length)],
     semFiltro: false,
+  };
+}
+
+export function criarSorteioDeterministico(semente: string): () => number {
+  let estado = 1779033703 ^ semente.length;
+
+  for (let indice = 0; indice < semente.length; indice += 1) {
+    estado = Math.imul(estado ^ semente.charCodeAt(indice), 3432918353);
+    estado = (estado << 13) | (estado >>> 19);
+  }
+
+  return () => {
+    estado = Math.imul(estado ^ (estado >>> 16), 2246822507);
+    estado = Math.imul(estado ^ (estado >>> 13), 3266489909);
+    estado ^= estado >>> 16;
+
+    return (estado >>> 0) / 4294967296;
   };
 }

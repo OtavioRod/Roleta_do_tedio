@@ -1,30 +1,22 @@
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { AppState, Platform, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
 import {
-    Convite,
-    observarConvitesRecebidos,
-    responderConvite,
+  Convite,
+  observarConvitesRecebidos,
+  responderConvite,
 } from "../services/convites";
-import { exibirNotificacaoLocal } from "../services/permissoes";
+import { notificar } from "../services/notificar";
 import { entrarNaSala } from "../services/salas";
 import {
-    codigoErroSocial,
-    mensagemErroSocial,
+  codigoErroSocial,
+  mensagemErroSocial,
 } from "../utils/mensagensSociais";
 import Botao from "./Botao";
 import Texto from "./Texto";
-
-function aplicativoEmSegundoPlano() {
-  if (Platform.OS === "web") {
-    return typeof document !== "undefined" && document.hidden;
-  }
-
-  return AppState.currentState !== "active";
-}
 
 export default function AvisoConvite() {
   const router = useRouter();
@@ -39,13 +31,10 @@ export default function AvisoConvite() {
 
   const conhecidos = useRef(new Set<string>());
   const primeiraLeitura = useRef(true);
-  const querNotificar = useRef(false);
 
   const ativo = Boolean(usuario) && emailOk && permissoesConcluidas;
 
   const nome = perfil?.nome || usuario?.displayName || "Pessoa";
-
-  querNotificar.current = perfil?.notificacoes.push === true;
 
   useEffect(() => {
     if (!usuario || !ativo) {
@@ -69,16 +58,12 @@ export default function AvisoConvite() {
 
           conhecidos.current.add(convite.id);
 
-          if (
-            !primeiraLeitura.current &&
-            querNotificar.current &&
-            aplicativoEmSegundoPlano()
-          ) {
-            exibirNotificacaoLocal(
-              `${convite.deNome} chamou você`,
-              `Sala ${convite.salaCodigo} da Roleta do Tédio`,
-            );
-          }
+          notificar({
+            titulo: `${convite.deNome} chamou você`,
+            texto: `Sala ${convite.salaCodigo} da Roleta do Tédio`,
+            som: "convite",
+            naTela: false,
+          });
         }
 
         primeiraLeitura.current = false;
