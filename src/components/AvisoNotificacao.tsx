@@ -48,9 +48,7 @@ export default function AvisoNotificacao() {
   return (
     <View style={styles.area} pointerEvents="box-none">
       <TouchableLibras
-        textoTraducao={
-          aviso.texto ? `${aviso.titulo}. ${aviso.texto}` : aviso.titulo
-        }
+        textoTraducao={aviso.texto ? `${aviso.titulo}. ${aviso.texto}` : aviso.titulo}
         onPress={() => setAviso(null)}
         activeOpacity={0.8}
         accessibilityRole="alert"

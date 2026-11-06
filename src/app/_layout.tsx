@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import AbrirSalaPendente from "@/components/AbrirSalaPendente";
 import AvisoConvite from "@/components/AvisoConvite";
 import AvisoNotificacao, {
   NotificadorSocial,
@@ -20,7 +21,9 @@ import {
 } from "@/context/PreferenciasContext";
 import { SessaoProvider, useSessao } from "@/context/SessaoContext";
 import { acordarBackend } from "@/services/acordarBackend";
+import OuvinteNotificacoes from "@/components/OuvinteNotificacoes";
 import { definirSistemaPermitido } from "@/services/notificar";
+import { carregarPreferenciasAudio } from "@/services/preferenciasAudio";
 import { configurarNotificacoes } from "@/services/permissoes";
 
 SplashScreen.preventAutoHideAsync();
@@ -34,6 +37,7 @@ function Conteudo() {
   useEffect(() => {
     acordarBackend();
     configurarNotificacoes().catch(() => undefined);
+    carregarPreferenciasAudio().catch(() => undefined);
   }, []);
 
   const permitePush = perfil?.notificacoes.push === true;
@@ -99,6 +103,10 @@ function Conteudo() {
           )}
 
           <PainelAcessibilidade />
+
+          <AbrirSalaPendente />
+
+          <OuvinteNotificacoes />
 
           <AvisoConvite />
 

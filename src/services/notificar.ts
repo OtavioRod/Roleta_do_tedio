@@ -1,4 +1,4 @@
-import { AppState, Platform } from "react-native";
+import { AccessibilityInfo, AppState, Platform } from "react-native";
 
 import { exibirNotificacaoLocal } from "./permissoes";
 import { NomeSom, tocarSom } from "./sons";
@@ -15,6 +15,7 @@ const ouvintes = new Set<Ouvinte>();
 
 let contador = 0;
 let sistemaPermitido = true;
+let pushAtivo = false;
 
 export function observarAvisos(ouvinte: Ouvinte) {
   ouvintes.add(ouvinte);
@@ -26,6 +27,18 @@ export function observarAvisos(ouvinte: Ouvinte) {
 
 export function definirSistemaPermitido(permitido: boolean) {
   sistemaPermitido = permitido;
+}
+
+export function definirPushAtivo(ativo: boolean) {
+  pushAtivo = ativo;
+}
+
+export function anunciar(texto: string) {
+  try {
+    AccessibilityInfo.announceForAccessibility?.(texto);
+  } catch {
+    // leitor de tela indisponível
+  }
 }
 
 export function aplicativoEmSegundoPlano() {
@@ -62,7 +75,8 @@ export function notificar({
   }
 
   if (segundoPlano) {
-    if (sistemaPermitido) {
+    // com push ativo no celular, o servidor já envia a notificação
+    if (sistemaPermitido && !(pushAtivo && Platform.OS !== "web")) {
       exibirNotificacaoLocal(titulo, texto ?? "").catch(() => undefined);
     }
 

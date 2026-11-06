@@ -1,15 +1,15 @@
 import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  onSnapshot,
-  query,
-  serverTimestamp,
-  setDoc,
-  Unsubscribe,
-  updateDoc,
-  where,
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    onSnapshot,
+    query,
+    serverTimestamp,
+    setDoc,
+    Unsubscribe,
+    updateDoc,
+    where,
 } from "firebase/firestore";
 
 import { obterFirestore } from "./firebase";

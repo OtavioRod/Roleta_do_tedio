@@ -10,9 +10,10 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
-import { Atividade } from "../data/atividades";
-import { pararSom, tocarSom } from "../services/sons";
 import Texto from "./Texto";
+import { Atividade } from "../data/atividades";
+import { vibrar } from "../services/preferenciasAudio";
+import { pararSom, tocarSom } from "../services/sons";
 
 const TAMANHO = 300;
 const CENTRO = TAMANHO / 2;
@@ -75,9 +76,8 @@ export default function RoletaAtividades({
   posicaoFixa,
 }: RoletaAtividadesProps) {
   const [parada, setParada] = useState(false);
-  const temporizadorResultado = useRef<ReturnType<typeof setTimeout> | null>(
-    null,
-  );
+  const temporizadorResultado =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
   const rotacao = useSharedValue(0);
   const estiloRotacao = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotacao.value}deg` }],
@@ -89,9 +89,15 @@ export default function RoletaAtividades({
       (atividade) => (ROTULOS[atividade.id] ?? atividade.nome).length,
     ),
   );
-  const espacoRadial = Math.min(raioRotulo - 30, RAIO - raioRotulo - 8) * 2;
+  const espacoRadial = Math.min(
+    raioRotulo - 30,
+    RAIO - raioRotulo - 8,
+  ) * 2;
   const espacoTangencial =
-    raioRotulo * 2 * Math.sin(Math.PI / Math.max(atividades.length, 1)) * 0.8;
+    raioRotulo *
+    2 *
+    Math.sin(Math.PI / Math.max(atividades.length, 1)) *
+    0.8;
   const tamanhoFonteRotulo = Math.max(
     1,
     Math.floor(
@@ -103,6 +109,7 @@ export default function RoletaAtividades({
     setParada(true);
     pararSom("roleta");
     tocarSom("resultado");
+    vibrar([0, 120, 80, 220]);
     temporizadorResultado.current = setTimeout(
       aoConcluir,
       DURACAO_RESULTADO_MS,
