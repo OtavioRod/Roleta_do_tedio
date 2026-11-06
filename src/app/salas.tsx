@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../components/Botao";
@@ -7,9 +7,22 @@ import CampoFormulario from "../components/CampoFormulario";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
-import { criarSala, entrarNaSala, TipoSala } from "../services/salas";
+import {
+  criarSala,
+  entrarNaSala,
+  observarMinhasSalas,
+  Sala,
+  TipoSala,
+} from "../services/salas";
 import { normalizarCodigo } from "../utils/codigos";
 import { mensagemErroSocial } from "../utils/mensagensSociais";
+
+const ROTULO_ESTADO: Record<Sala["estado"], string> = {
+  aguardando: "aguardando o grupo",
+  respondendo: "rodada em andamento",
+  resultado: "resultado pronto",
+  encerrada: "encerrada",
+};
 
 export default function Salas() {
   const router = useRouter();
@@ -23,6 +36,17 @@ export default function Salas() {
   const [codigo, setCodigo] = useState("");
   const [erro, setErro] = useState("");
   const [ocupado, setOcupado] = useState(false);
+  const [minhasSalas, setMinhasSalas] = useState<Sala[]>([]);
+
+  const uid = usuario?.uid ?? "";
+
+  useEffect(() => {
+    if (!uid) {
+      return undefined;
+    }
+
+    return observarMinhasSalas(uid, setMinhasSalas, () => setMinhasSalas([]));
+  }, [uid]);
 
   function abrirSala(codigoSala: string) {
     router.push({ pathname: "/sala/[codigo]", params: { codigo: codigoSala } });
@@ -81,6 +105,36 @@ export default function Salas() {
           Cada pessoa responde no próprio aparelho, e a roleta decide pelo grupo
           todo.
         </Texto>
+
+        {minhasSalas.length > 0 && (
+          <>
+            <Texto cabecalho style={styles.secao}>
+              Minhas salas ativas
+            </Texto>
+
+            {minhasSalas.map((sala) => (
+              <View
+                key={sala.codigo}
+                style={[styles.cartaoSala, { borderColor: cores.borda }]}
+              >
+                <Texto style={styles.cartaoTitulo}>
+                  Sala {sala.codigo} ·{" "}
+                  {sala.tipo === "casal" ? "casal" : "amigos"}
+                </Texto>
+
+                <Texto style={styles.cartaoTexto}>
+                  {sala.membrosUids.length} de {sala.limite} pessoas ·{" "}
+                  {ROTULO_ESTADO[sala.estado]}
+                </Texto>
+
+                <Botao
+                  titulo="Voltar para a sala"
+                  onPress={() => abrirSala(sala.codigo)}
+                />
+              </View>
+            ))}
+          </>
+        )}
 
         <Texto cabecalho style={styles.secao}>
           Criar uma sala
@@ -192,5 +246,23 @@ const styles = StyleSheet.create({
 
   espaco: {
     height: 10,
+  },
+
+  cartaoSala: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+  },
+
+  cartaoTitulo: {
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 4,
+  },
+
+  cartaoTexto: {
+    fontSize: 15,
+    marginBottom: 10,
   },
 });

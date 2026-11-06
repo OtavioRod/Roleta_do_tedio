@@ -28,6 +28,12 @@ import {
   lerEntradaNativaAtivada,
 } from "../services/entradaNativa";
 import {
+  carregarPreferenciasAudio,
+  obterPreferenciasAudio,
+  salvarPreferenciasAudio,
+  vibrar,
+} from "../services/preferenciasAudio";
+import {
   EstadoPermissao,
   estadoLocalizacao,
   estadoNotificacoes,
@@ -237,6 +243,28 @@ export default function Perfil() {
 
   const email = perfil?.email || usuario?.email || "";
 
+  const [preferenciasAudio, setPreferenciasAudio] = useState(
+    obterPreferenciasAudio(),
+  );
+
+  useEffect(() => {
+    carregarPreferenciasAudio()
+      .then(setPreferenciasAudio)
+      .catch(() => undefined);
+  }, []);
+
+  function alterarAudio(campo: "som" | "vibracao", valor: boolean) {
+    const novas = { ...preferenciasAudio, [campo]: valor };
+
+    setPreferenciasAudio(novas);
+
+    salvarPreferenciasAudio(novas).catch(() => undefined);
+
+    if (campo === "vibracao" && valor) {
+      vibrar(120);
+    }
+  }
+
   const entradaNativaAtivada =
     usuario?.uid === preferenciaEntradaNativa?.uid &&
     preferenciaEntradaNativa?.ativada === true;
@@ -338,6 +366,36 @@ export default function Perfil() {
             )}
           </Secao>
         )}
+
+        <Secao titulo="Sons e vibração">
+          <View style={styles.linhaEntradaNativa}>
+            <Texto style={styles.rotuloEntradaNativa}>Sons do aplicativo</Texto>
+
+            <Switch
+              value={preferenciasAudio.som}
+              onValueChange={(valor) => alterarAudio("som", valor)}
+              accessibilityRole="switch"
+              accessibilityLabel="Sons do aplicativo"
+              accessibilityHint="Liga ou desliga cliques, avisos e o som da roleta."
+              accessibilityState={{ checked: preferenciasAudio.som }}
+            />
+          </View>
+
+          <View style={styles.linhaEntradaNativa}>
+            <Texto style={styles.rotuloEntradaNativa}>
+              Vibrar quando a roleta decidir
+            </Texto>
+
+            <Switch
+              value={preferenciasAudio.vibracao}
+              onValueChange={(valor) => alterarAudio("vibracao", valor)}
+              accessibilityRole="switch"
+              accessibilityLabel="Vibração"
+              accessibilityHint="Faz o aparelho vibrar quando o resultado sai."
+              accessibilityState={{ checked: preferenciasAudio.vibracao }}
+            />
+          </View>
+        </Secao>
 
         <Secao titulo="Avisos e permissões">
           <Linha

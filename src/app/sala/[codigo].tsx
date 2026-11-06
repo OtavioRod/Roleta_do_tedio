@@ -3,39 +3,93 @@ import { useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../../components/Botao";
+import ContagemPrazo from "../../components/ContagemPrazo";
+import ConviteSala from "../../components/ConviteSala";
+import EscolhaLocalGrupo from "../../components/EscolhaLocalGrupo";
+import ExplicacaoResultado from "../../components/ExplicacaoResultado";
 import PerguntasRoleta from "../../components/PerguntasRoleta";
 import RoletaAtividades from "../../components/RoletaAtividades";
 import Texto from "../../components/Texto";
+import VotacaoResultado from "../../components/VotacaoResultado";
 import { usePreferencias } from "../../context/PreferenciasContext";
 import { useSessao } from "../../context/SessaoContext";
 import { atividades } from "../../data/atividades";
 import { Amizade, observarAmizades } from "../../services/amigos";
 import { enviarConvite } from "../../services/convites";
-import { notificar } from "../../services/notificar";
+import { anunciar, notificar } from "../../services/notificar";
+import { TipoLocal } from "../../services/overpass";
+import { definirSalaAberta } from "../../services/permissoes";
 import {
-  criarSala as _criarSalaNaoUsada,
-  definirResultado,
-  entrarNaSala,
-  enviarProgresso,
-  enviarRespostas,
-  iniciarRodada,
-  MembroSala,
-  observarMembros,
-  observarSala,
-  Respostas,
-  sairDaSala,
-  Sala,
+    criarSala as _criarSalaNaoUsada,
+    confirmarResultado,
+    definirDiscreto,
+    definirResultado,
+    entrarNaSala,
+    enviarProgresso,
+    enviarRespostas,
+    girarDeNovo,
+    iniciarRodada,
+    MembroSala,
+    observarMembros,
+    observarSala,
+    registrarPresenca,
+    removerParticipante,
+    Respostas,
+    sairDaSala,
+    Sala,
+    votarNoResultado,
 } from "../../services/salas";
-import { tocarSom } from "../../services/sons";
 import { normalizarCodigo } from "../../utils/codigos";
 import { compartilharTexto } from "../../utils/compartilhar";
 import { mensagemErroSocial } from "../../utils/mensagensSociais";
+import { tocarSom } from "../../services/sons";
 import {
-  criarSorteioDeterministico,
-  escolherAtividadeDoGrupo,
+    apurarVotacao,
+    criarSorteioDeterministico,
+    MembroParaDecisao,
+    ParticipanteGrupo,
+    participantesDaRodada,
+    sortearParaSala,
 } from "../../utils/recomendacao";
 
 void _criarSalaNaoUsada;
+
+const TIPO_LOCAL_POR_ATIVIDADE: Partial<Record<string, TipoLocal>> = {
+  restaurante: "restaurante",
+  cafe: "cafe",
+  cinema: "cinema",
+  parque: "parque",
+  passeio: "passeio",
+};
+
+const LIMITE_AUSENTE_MS = 90000;
+
+type StatusPresenca = "online" | "ausente" | "conectando";
+
+const ROTULO_PRESENCA: Record<StatusPresenca, string> = {
+  online: "online",
+  ausente: "sem conexão",
+  conectando: "conectando...",
+};
+
+function statusDe(membro: MembroSala, agora: number): StatusPresenca {
+  if (membro.visto === 0) {
+    return "conectando";
+  }
+
+  return agora - membro.visto < LIMITE_AUSENTE_MS ? "online" : "ausente";
+}
+
+function paraDecisao(membros: MembroSala[]): MembroParaDecisao[] {
+  return membros.map((membro) => ({
+    uid: membro.uid,
+    rodada: membro.rodada,
+    respostas: membro.respostas,
+    nome: membro.nome,
+    votoTentativa: membro.voto?.tentativa ?? 0,
+    votoValor: membro.voto?.valor ?? null,
+  }));
+}
 
 export default function TelaSala() {
   const router = useRouter();
@@ -64,10 +118,18 @@ export default function TelaSala() {
 
   const [girando, setGirando] = useState(false);
 
-  const calculando = useRef(false);
+  const [agora, setAgora] = useState(Date.now());
+
+  const acaoResultado = useRef("");
+  const acaoVotacao = useRef("");
   const estadoAnterior = useRef<string | null>(null);
+  const tentativaAnterior = useRef(0);
+  const confirmadaAnterior = useRef(false);
+  const donoAnterior = useRef<string | null>(null);
   const membrosVistos = useRef<Map<string, string> | null>(null);
-  const prontosAnteriores = useRef(0);
+  const statusAnteriores = useRef<Map<string, StatusPresenca> | null>(null);
+  const prontosVistos = useRef<Set<string> | null>(null);
+  const progressoVisto = useRef<Map<string, number>>(new Map());
 
   const souMembro = Boolean(sala && sala.membrosUids.includes(uid));
   const souDono = Boolean(sala && sala.donoUid === uid);
@@ -104,50 +166,126 @@ export default function TelaSala() {
   }, [uid]);
 
   useEffect(() => {
+    const intervalo = setInterval(() => setAgora(Date.now()), 5000);
+
+    return () => clearInterval(intervalo);
+  }, []);
+
+  useEffect(() => {
+    if (!codigo) {
+      return undefined;
+    }
+
+    definirSalaAberta(codigo);
+
+    return () => definirSalaAberta(null);
+  }, [codigo]);
+
+  useEffect(() => {
+    if (!codigo || !uid || !souMembro) {
+      return undefined;
+    }
+
+    registrarPresenca(codigo, uid).catch(() => undefined);
+
+    const intervalo = setInterval(() => {
+      registrarPresenca(codigo, uid).catch(() => undefined);
+    }, 25000);
+
+    return () => clearInterval(intervalo);
+  }, [codigo, uid, souMembro]);
+
+  useEffect(() => {
     if (!sala) {
       return;
     }
 
     const anterior = estadoAnterior.current;
+    const tentativaAntes = tentativaAnterior.current;
+    const confirmadaAntes = confirmadaAnterior.current;
 
     estadoAnterior.current = sala.estado;
+    tentativaAnterior.current = sala.tentativa;
+    confirmadaAnterior.current = sala.confirmada;
 
-    if (anterior === null || anterior === sala.estado) {
+    if (anterior === null) {
       return;
     }
 
-    if (sala.estado === "respondendo") {
-      setGirando(false);
+    if (anterior !== sala.estado) {
+      if (sala.estado === "respondendo") {
+        setGirando(false);
 
-      if (!souDono) {
+        if (!souDono) {
+          notificar({
+            titulo: "A rodada começou!",
+            texto: "Responda às perguntas para a roleta decidir.",
+            som: "convite",
+          });
+        }
+      }
+
+      if (sala.estado === "resultado") {
+        setGirando(true);
+
         notificar({
-          titulo: "A rodada começou!",
-          texto: "Responda às perguntas para a roleta decidir.",
-          som: "convite",
+          titulo: "A roleta vai girar!",
+          texto: "Volte ao app para ver a atividade escolhida.",
+          som: "nenhum",
+          quando: "segundoPlano",
         });
       }
-    }
 
-    if (sala.estado === "resultado") {
+      if (sala.estado === "encerrada" && !souDono) {
+        notificar({
+          titulo: "A sala foi encerrada",
+          texto: `${sala.donoNome} encerrou a sala ${sala.codigo}.`,
+          som: "notificacao",
+        });
+      }
+    } else if (
+      sala.estado === "resultado" &&
+      tentativaAntes > 0 &&
+      sala.tentativa > tentativaAntes
+    ) {
       setGirando(true);
 
       notificar({
-        titulo: "A roleta vai girar!",
-        texto: "Volte ao app para ver a atividade escolhida.",
+        titulo: "O grupo pediu outro giro!",
+        texto: "A roleta vai girar de novo sem a atividade recusada.",
         som: "nenhum",
         quando: "segundoPlano",
       });
     }
 
-    if (sala.estado === "encerrada" && !souDono) {
+    if (!confirmadaAntes && sala.confirmada && sala.resultado) {
       notificar({
-        titulo: "A sala foi encerrada",
-        texto: `${sala.donoNome} encerrou a sala ${sala.codigo}.`,
-        som: "notificacao",
+        titulo: "Topamos!",
+        texto: sala.resultado.atividadeNome,
+        som: "resultado",
+        quando: "segundoPlano",
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sala?.estado]);
+  }, [sala?.estado, sala?.tentativa, sala?.confirmada]);
+
+  useEffect(() => {
+    if (!sala) {
+      return;
+    }
+
+    const antes = donoAnterior.current;
+
+    donoAnterior.current = sala.donoUid;
+
+    if (antes !== null && antes !== sala.donoUid && sala.donoUid === uid) {
+      notificar({
+        titulo: "Você agora é o dono da sala",
+        texto: "O comando da sala passou para você.",
+        som: "convite",
+      });
+    }
+  }, [sala, uid]);
 
   useEffect(() => {
     if (!sala || !souMembro) {
@@ -195,27 +333,153 @@ export default function TelaSala() {
   }, [sala, membros, souMembro, uid]);
 
   useEffect(() => {
-    if (!sala || sala.estado !== "respondendo") {
-      prontosAnteriores.current = 0;
+    if (!sala || !souMembro || membros.length === 0) {
+      statusAnteriores.current = null;
 
       return;
     }
 
-    const quantidade = membros.filter(
-      (membro) => membro.respostas !== null && membro.rodada === sala.rodada,
-    ).length;
+    const atuais = new Map<string, StatusPresenca>();
 
-    if (quantidade > prontosAnteriores.current) {
-      tocarSom("entrou");
+    for (const membro of membros) {
+      atuais.set(membro.uid, statusDe(membro, agora));
     }
 
-    prontosAnteriores.current = quantidade;
-  }, [sala, membros]);
+    const antes = statusAnteriores.current;
+
+    statusAnteriores.current = atuais;
+
+    if (antes === null) {
+      return;
+    }
+
+    for (const membro of membros) {
+      if (membro.uid === uid) {
+        continue;
+      }
+
+      const antigo = antes.get(membro.uid);
+      const novo = atuais.get(membro.uid);
+
+      if (antigo === "online" && novo === "ausente") {
+        notificar({
+          titulo: `${membro.nome || "Alguém"} perdeu a conexão`,
+          texto: "A sala continua; a pessoa pode voltar a qualquer momento.",
+          som: "notificacao",
+        });
+      }
+
+      if (antigo === "ausente" && novo === "online") {
+        notificar({
+          titulo: `${membro.nome || "Alguém"} voltou para a sala`,
+          som: "entrou",
+        });
+      }
+    }
+  }, [sala, membros, souMembro, uid, agora]);
+
+  useEffect(() => {
+    if (!sala || sala.estado !== "respondendo") {
+      prontosVistos.current = null;
+      progressoVisto.current = new Map();
+
+      return;
+    }
+
+    const prontosAgora = new Set(
+      membros
+        .filter(
+          (membro) =>
+            membro.respostas !== null && membro.rodada === sala.rodada,
+        )
+        .map((membro) => membro.uid),
+    );
+
+    const antes = prontosVistos.current;
+
+    prontosVistos.current = prontosAgora;
+
+    for (const membro of membros) {
+      if (membro.uid === uid || sala.discreto) {
+        continue;
+      }
+
+      const anteriorProgresso = progressoVisto.current.get(membro.uid) ?? 0;
+
+      const progressoAtual =
+        membro.progressoRodada === sala.rodada ? membro.progresso : 0;
+
+      if (
+        antes !== null &&
+        progressoAtual > anteriorProgresso &&
+        progressoAtual < 4
+      ) {
+        anunciar(
+          `${membro.nome || "Alguém"} respondeu ${progressoAtual} de 4 perguntas.`,
+        );
+      }
+
+      progressoVisto.current.set(membro.uid, progressoAtual);
+    }
+
+    if (antes === null) {
+      return;
+    }
+
+    let alguemTerminou = false;
+
+    prontosAgora.forEach((membroUid) => {
+      if (!antes.has(membroUid) && membroUid !== uid) {
+        alguemTerminou = true;
+
+        const quem = sala.discreto
+          ? "Alguém"
+          : membros.find((membro) => membro.uid === membroUid)?.nome ||
+            "Alguém";
+
+        anunciar(`${quem} terminou de responder.`);
+      }
+    });
+
+    if (alguemTerminou) {
+      tocarSom("entrou");
+    }
+  }, [sala, membros, uid]);
+
+  function gravarResultado(participantes: ParticipanteGrupo[]) {
+    if (!sala) {
+      return Promise.resolve();
+    }
+
+    const chave = `r-${sala.rodada}`;
+
+    if (acaoResultado.current === chave) {
+      return Promise.resolve();
+    }
+
+    acaoResultado.current = chave;
+
+    const { atividade, semFiltro } = sortearParaSala(
+      sala.codigo,
+      sala.rodada,
+      1,
+      participantes,
+      sala.ultimaAtividadeId ? [sala.ultimaAtividadeId] : [],
+    );
+
+    return definirResultado(sala.codigo, {
+      atividadeId: atividade.id,
+      atividadeNome: atividade.nome,
+      semFiltro,
+    }).catch((falha) => {
+      acaoResultado.current = "";
+
+      throw falha;
+    });
+  }
 
   useEffect(() => {
     if (!sala || !souMembro || sala.estado !== "respondendo") {
-      calculando.current = false;
-
       return undefined;
     }
 
@@ -223,53 +487,143 @@ export default function TelaSala() {
       return undefined;
     }
 
-    const todosProntos = membros.every(
-      (membro) => membro.respostas !== null && membro.rodada === sala.rodada,
+    const participantes = participantesDaRodada(
+      paraDecisao(membros),
+      sala.rodada,
     );
 
-    if (!todosProntos || calculando.current) {
+    if (participantes.length !== membros.length) {
       return undefined;
     }
 
-    const calcular = () => {
-      calculando.current = true;
-
-      const participantes = [...membros]
-        .sort((a, b) => (a.uid < b.uid ? -1 : 1))
-        .map((membro) => ({
-          nome: membro.nome,
-          ...membro.respostas!,
-        }));
-
-      const sorteio = criarSorteioDeterministico(
-        `${sala.codigo}-${sala.rodada}`,
-      );
-
-      const { atividade, semFiltro } = escolherAtividadeDoGrupo(
-        participantes,
-        sorteio,
-      );
-
-      definirResultado(sala.codigo, {
-        atividadeId: atividade.id,
-        atividadeNome: atividade.nome,
-        semFiltro,
-      }).catch((falha) => {
-        calculando.current = false;
-
-        if (souDono) {
-          setErro(mensagemErroSocial(falha));
-        }
-      });
+    const aoFalhar = (falha: unknown) => {
+      if (souDono) {
+        setErro(mensagemErroSocial(falha));
+      }
     };
 
     if (souDono) {
-      calcular();
+      gravarResultado(participantes).catch(aoFalhar);
 
       return undefined;
     }
 
-    const reserva = setTimeout(calcular, 4000);
+    // O servidor calcula primeiro; se ele não responder, um membro assume.
+    const reserva = setTimeout(
+      () => gravarResultado(participantes).catch(aoFalhar),
+      10000,
+    );
+
+    return () => clearTimeout(reserva);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sala, membros, souDono, souMembro]);
+
+  useEffect(() => {
+    if (
+      !sala ||
+      !souDono ||
+      sala.estado !== "respondendo" ||
+      sala.prazoEm <= 0 ||
+      agora <= sala.prazoEm ||
+      membros.length === 0
+    ) {
+      return;
+    }
+
+    const participantes = participantesDaRodada(
+      paraDecisao(membros),
+      sala.rodada,
+    );
+
+    if (participantes.length >= 2) {
+      gravarResultado(participantes).catch((falha) =>
+        setErro(mensagemErroSocial(falha)),
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agora, sala, membros, souDono]);
+
+  useEffect(() => {
+    if (
+      !sala ||
+      !souMembro ||
+      sala.estado !== "resultado" ||
+      sala.confirmada ||
+      sala.tentativa < 1 ||
+      !sala.resultado
+    ) {
+      return undefined;
+    }
+
+    if (membros.length === 0 || membros.length !== sala.membrosUids.length) {
+      return undefined;
+    }
+
+    const dados = paraDecisao(membros);
+
+    const decisao = apurarVotacao(dados, sala.tentativa);
+
+    if (decisao === "aguardando") {
+      return undefined;
+    }
+
+    const chave = `v-${sala.rodada}-${sala.tentativa}-${decisao}`;
+
+    if (acaoVotacao.current === chave) {
+      return undefined;
+    }
+
+    const aplicar = () => {
+      if (!sala.resultado || acaoVotacao.current === chave) {
+        return;
+      }
+
+      acaoVotacao.current = chave;
+
+      const liberar = () => {
+        acaoVotacao.current = "";
+      };
+
+      if (decisao === "confirmar") {
+        confirmarResultado(
+          sala.codigo,
+          sala.rodada,
+          sala.resultado,
+          sala.historico,
+        ).catch(liberar);
+
+        return;
+      }
+
+      const vetadas = [...sala.vetadas, sala.resultado.atividadeId];
+
+      const { atividade, semFiltro } = sortearParaSala(
+        sala.codigo,
+        sala.rodada,
+        sala.tentativa + 1,
+        participantesDaRodada(dados, sala.rodada),
+        sala.ultimaAtividadeId ? [...vetadas, sala.ultimaAtividadeId] : vetadas,
+      );
+
+      girarDeNovo(
+        sala.codigo,
+        {
+          atividadeId: atividade.id,
+          atividadeNome: atividade.nome,
+          semFiltro,
+        },
+        sala.tentativa + 1,
+        vetadas,
+      ).catch(liberar);
+    };
+
+    if (souDono) {
+      aplicar();
+
+      return undefined;
+    }
+
+    const reserva = setTimeout(aplicar, 10000);
 
     return () => clearTimeout(reserva);
   }, [sala, membros, souDono, souMembro]);
@@ -294,16 +648,72 @@ export default function TelaSala() {
     });
   }
 
-  function sair() {
+  function sair(passarComando = true) {
     if (!sala) {
       return;
     }
 
+    const outros = sala.membrosUids.filter((membroUid) => membroUid !== uid);
+
+    const proximoUid = souDono && passarComando === true ? outros[0] : undefined;
+
+    const proximo = proximoUid
+      ? {
+          uid: proximoUid,
+          nome:
+            membros.find((membro) => membro.uid === proximoUid)?.nome ||
+            "Participante",
+        }
+      : undefined;
+
     executar(async () => {
-      await sairDaSala(sala.codigo, uid, souDono);
+      await sairDaSala(sala.codigo, uid, souDono, proximo);
 
       router.replace("/salas");
     });
+  }
+
+  function alternarDiscreto() {
+    if (!sala) {
+      return;
+    }
+
+    executar(() => definirDiscreto(sala.codigo, !sala.discreto));
+  }
+
+  function continuarSemPendentes() {
+    if (!sala) {
+      return;
+    }
+
+    const participantes = participantesDaRodada(
+      paraDecisao(membros),
+      sala.rodada,
+    );
+
+    if (participantes.length < 2) {
+      setErro("Precisa de pelo menos 2 pessoas que já responderam.");
+
+      return;
+    }
+
+    executar(() => gravarResultado(participantes));
+  }
+
+  function remover(membroUid: string) {
+    if (!sala) {
+      return;
+    }
+
+    executar(() => removerParticipante(sala.codigo, membroUid));
+  }
+
+  function votar(valor: "topo" | "nao") {
+    if (!sala) {
+      return;
+    }
+
+    executar(() => votarNoResultado(sala.codigo, uid, sala.tentativa, valor));
   }
 
   async function compartilharCodigo() {
@@ -494,6 +904,32 @@ export default function TelaSala() {
     ? atividades.find((item) => item.id === sala.resultado?.atividadeId)
     : undefined;
 
+  const participantesRodada = participantesDaRodada(
+    paraDecisao(membros),
+    sala.rodada,
+  );
+
+  const pendentes = sala.membrosUids.filter((membroUid) => {
+    const membro = membros.find((item) => item.uid === membroUid);
+
+    return !(
+      membro &&
+      membro.respostas !== null &&
+      membro.rodada === sala.rodada
+    );
+  });
+
+  const ultimasRespostas =
+    meuMembro && meuMembro.respostas !== null && meuMembro.rodada < sala.rodada
+      ? meuMembro.respostas
+      : null;
+
+  const tipoLocal = sala.resultado
+    ? TIPO_LOCAL_POR_ATIVIDADE[sala.resultado.atividadeId]
+    : undefined;
+
+  const outrosNaSala = sala.membrosUids.length > 1;
+
   if (sala.estado === "respondendo" && !jaRespondi) {
     return (
       <PerguntasRoleta
@@ -503,7 +939,9 @@ export default function TelaSala() {
         erro={erro}
         aoProgresso={registrarProgresso}
         aoFinalizar={finalizarRespostas}
-        aoSair={sair}
+        aoSair={() => sair()}
+        ultimasRespostas={ultimasRespostas}
+        prazoEm={sala.prazoEm}
       />
     );
   }
@@ -515,9 +953,12 @@ export default function TelaSala() {
           atividades={atividades}
           selecionada={atividade}
           posicaoFixa={criarSorteioDeterministico(
-            `posicao-${sala.codigo}-${sala.rodada}`,
+            `posicao-${sala.codigo}-${sala.rodada}-${sala.tentativa}`,
           )()}
-          aoConcluir={() => setGirando(false)}
+          aoConcluir={() => {
+            setGirando(false);
+            anunciar(`A roleta decidiu: ${atividade.nome}.`);
+          }}
         />
       </View>
     );
@@ -566,17 +1007,36 @@ export default function TelaSala() {
                 {membroUid === uid ? " (você)" : ""}
               </Texto>
 
+              {membro && membroUid !== uid && (
+                <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
+                  {ROTULO_PRESENCA[statusDe(membro, agora)]}
+                </Texto>
+              )}
+
               {sala.estado === "respondendo" && (
                 <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
                   {respondeu
                     ? "Respondeu ✓"
-                    : membro &&
+                    : !sala.discreto &&
+                        membro &&
                         membro.progressoRodada === sala.rodada &&
                         membro.progresso > 0
                       ? `Respondendo... pergunta ${Math.min(membro.progresso + 1, 4)} de 4`
                       : "Respondendo..."}
                 </Texto>
               )}
+
+              {souDono &&
+                membroUid !== uid &&
+                (sala.estado === "aguardando" ||
+                  (sala.estado === "respondendo" && !respondeu)) && (
+                  <Botao
+                    titulo={`Remover ${membro?.nome || "participante"} da sala`}
+                    secundario
+                    onPress={() => remover(membroUid)}
+                    desabilitado={ocupado}
+                  />
+                )}
             </View>
           );
         })}
@@ -586,6 +1046,8 @@ export default function TelaSala() {
             <Texto cabecalho style={styles.secao}>
               Chamar pessoas
             </Texto>
+
+            <ConviteSala codigo={sala.codigo} />
 
             <Botao
               titulo="Compartilhar o código da sala"
@@ -649,6 +1111,23 @@ export default function TelaSala() {
             {souDono ? (
               <>
                 <Botao
+                  titulo={
+                    sala.discreto ? "Modo discreto: ligado" : "Modo discreto: desligado"
+                  }
+                  secundario
+                  onPress={alternarDiscreto}
+                  desabilitado={ocupado}
+                />
+
+                <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
+                  O modo discreto esconde o progresso e os nomes nas explicações
+                  da roleta. Ele é uma opção de tela: quem entende de tecnologia
+                  ainda consegue ler os dados da sala.
+                </Texto>
+
+                <View style={styles.espaco} />
+
+                <Botao
                   titulo="Começar"
                   onPress={comecar}
                   desabilitado={!podeComecar || ocupado}
@@ -667,19 +1146,41 @@ export default function TelaSala() {
             ) : (
               <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
                 Aguardando {sala.donoNome} começar...
+                {sala.discreto ? " (modo discreto ligado)" : ""}
               </Texto>
             )}
           </>
         )}
 
         {sala.estado === "respondendo" && jaRespondi && (
-          <Texto
-            accessibilityLiveRegion="polite"
-            style={[styles.texto, { marginTop: 16 }]}
-          >
-            Respostas enviadas. Aguardando os outros: {prontos} de{" "}
-            {sala.membrosUids.length} prontos.
-          </Texto>
+          <>
+            <Texto
+              accessibilityLiveRegion="polite"
+              style={[styles.texto, { marginTop: 16 }]}
+            >
+              Respostas enviadas. Aguardando os outros: {prontos} de{" "}
+              {sala.membrosUids.length} prontos.
+            </Texto>
+
+            <ContagemPrazo prazoEm={sala.prazoEm} />
+
+            {souDono && pendentes.length > 0 && (
+              <>
+                <Botao
+                  titulo="Continuar sem quem falta"
+                  secundario
+                  onPress={continuarSemPendentes}
+                  desabilitado={ocupado || prontos < 2}
+                />
+
+                <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
+                  {prontos < 2
+                    ? "Precisa de pelo menos 2 pessoas que já responderam."
+                    : "A roleta decide só com quem já respondeu. Passado o prazo, isso acontece sozinho."}
+                </Texto>
+              </>
+            )}
+          </>
         )}
 
         {sala.estado === "resultado" && sala.resultado && (
@@ -698,17 +1199,42 @@ export default function TelaSala() {
               <Texto style={styles.texto}>{atividade?.descricao ?? ""}</Texto>
             </View>
 
-            {sala.resultado.semFiltro && (
-              <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
-                Nada combinou perfeitamente com as respostas de todos, então a
-                roleta improvisou.
-              </Texto>
+            {atividade && (
+              <ExplicacaoResultado
+                participantes={participantesRodada}
+                atividade={atividade}
+                semFiltro={sala.resultado.semFiltro}
+                ocultarNomes={sala.discreto}
+              />
             )}
 
-            <Botao
-              titulo="Ver opções perto de vocês"
-              onPress={continuarNoApp}
-            />
+            {!sala.confirmada && (
+              <VotacaoResultado
+                tentativa={sala.tentativa}
+                atividadesVetadas={sala.vetadas}
+                membros={membros}
+                meuVoto={meuMembro?.voto ?? null}
+                ocupado={ocupado}
+                aoVotar={votar}
+              />
+            )}
+
+            {sala.confirmada && tipoLocal && (
+              <EscolhaLocalGrupo
+                sala={sala}
+                membros={membros}
+                uid={uid}
+                souDono={souDono}
+                tipoLocal={tipoLocal}
+              />
+            )}
+
+            {sala.confirmada && (
+              <Botao
+                titulo="Ver opções perto de vocês"
+                onPress={continuarNoApp}
+              />
+            )}
 
             {souDono && (
               <>
@@ -722,6 +1248,20 @@ export default function TelaSala() {
                 />
               </>
             )}
+          </>
+        )}
+
+        {sala.historico.length > 0 && (
+          <>
+            <Texto cabecalho style={styles.secao}>
+              Rodadas anteriores
+            </Texto>
+
+            {sala.historico.map((item) => (
+              <Texto key={`${item.rodada}-${item.atividadeId}`} style={styles.texto}>
+                Rodada {item.rodada}: {item.atividadeNome}
+              </Texto>
+            ))}
           </>
         )}
 
@@ -743,11 +1283,30 @@ export default function TelaSala() {
         <View style={styles.espacoGrande} />
 
         <Botao
-          titulo={souDono ? "Encerrar a sala" : "Sair da sala"}
+          titulo={
+            souDono && outrosNaSala
+              ? "Sair da sala (passar o comando)"
+              : souDono
+                ? "Encerrar a sala"
+                : "Sair da sala"
+          }
           secundario
-          onPress={sair}
+          onPress={() => sair()}
           desabilitado={ocupado}
         />
+
+        {souDono && outrosNaSala && (
+          <>
+            <View style={styles.espaco} />
+
+            <Botao
+              titulo="Encerrar a sala para todos"
+              secundario
+              onPress={() => sair(false)}
+              desabilitado={ocupado}
+            />
+          </>
+        )}
       </View>
     </ScrollView>
   );

@@ -64,7 +64,10 @@ export default function Botao({
         },
       ]}
     >
-      <Texto librasIgnorado style={[styles.texto, { color: corTexto }]}>
+      <Texto
+        librasIgnorado
+        style={[styles.texto, { color: corTexto }]}
+      >
         {titulo}
       </Texto>
     </TouchableLibras>

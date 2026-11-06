@@ -129,14 +129,21 @@ function pontuar(atividade: Atividade, participantes: ParticipanteGrupo[]) {
 export function escolherAtividadeDoGrupo(
   participantes: ParticipanteGrupo[],
   sorteio: () => number = Math.random,
+  excluirIds: string[] = [],
 ): { atividade: Atividade; semFiltro: boolean } {
-  const validas = atividades.filter((atividade) =>
+  const permitidas = atividades.filter(
+    (atividade) => !excluirIds.includes(atividade.id),
+  );
+
+  const base = permitidas.length > 0 ? permitidas : atividades;
+
+  const validas = base.filter((atividade) =>
     podeSerEscolhida(atividade, participantes),
   );
 
   if (validas.length === 0) {
     return {
-      atividade: atividades[Math.floor(sorteio() * atividades.length)],
+      atividade: base[Math.floor(sorteio() * base.length)],
       semFiltro: true,
     };
   }
@@ -176,4 +183,164 @@ export function criarSorteioDeterministico(semente: string): () => number {
 
     return (estado >>> 0) / 4294967296;
   };
+}
+
+const ORDEM_DISPOSICAO: Disposicao[] = ["baixa", "media", "alta"];
+
+const ROTULO_DISPOSICAO: Record<Disposicao, string> = {
+  baixa: "pouca disposição",
+  media: "disposição média",
+  alta: "muita disposição",
+};
+
+function juntarNomes(nomes: string[]) {
+  if (nomes.length <= 1) {
+    return nomes[0] ?? "";
+  }
+
+  return `${nomes.slice(0, -1).join(", ")} e ${nomes[nomes.length - 1]}`;
+}
+
+export function explicarResultado(
+  participantes: ParticipanteGrupo[],
+  atividade: Atividade,
+  semFiltro: boolean,
+  ocultarNomes = false,
+): string[] {
+  if (participantes.length === 0) {
+    return [];
+  }
+
+  if (semFiltro) {
+    return [
+      "Nenhuma atividade combinou com todas as respostas ao mesmo tempo, então a roleta improvisou.",
+    ];
+  }
+
+  const quem = (nomes: string[]) =>
+    ocultarNomes || participantes.length === 1
+      ? ""
+      : ` (${juntarNomes(nomes)})`;
+
+  const linhas: string[] = [];
+
+  const indicesGasto = participantes.map((participante) =>
+    OPCOES_GASTO.findIndex((opcao) => opcao.valor === participante.gasto),
+  );
+
+  const menorIndiceGasto = Math.min(...indicesGasto);
+
+  const limitantesGasto = participantes
+    .filter((_, indice) => indicesGasto[indice] === menorIndiceGasto)
+    .map((participante) => participante.nome);
+
+  const rotuloGasto = OPCOES_GASTO[menorIndiceGasto]?.rotulo ?? "";
+
+  const todosNoMesmoGasto = limitantesGasto.length === participantes.length;
+
+  linhas.push(
+    todosNoMesmoGasto && participantes.length > 1
+      ? `Todos topam gastar ${rotuloGasto.toLowerCase()} e "${atividade.nome}" cabe nesse orçamento.`
+      : `O menor orçamento do grupo é ${rotuloGasto.toLowerCase()}${quem(limitantesGasto)} e "${atividade.nome}" cabe nele.`,
+  );
+
+  const minutos = participantes.map((participante) =>
+    converterTempo(participante.tempo),
+  );
+
+  const menorMinutos = Math.min(...minutos);
+
+  const limitantesTempo = participantes
+    .filter((_, indice) => minutos[indice] === menorMinutos)
+    .map((participante) => participante.nome);
+
+  linhas.push(
+    `O menor tempo disponível é ${menorMinutos} min${quem(limitantesTempo)}; a atividade pede pelo menos ${atividade.tempoMinimo} min.`,
+  );
+
+  const indicesDisposicao = participantes.map((participante) =>
+    ORDEM_DISPOSICAO.indexOf(participante.disposicao),
+  );
+
+  const menorIndiceDisposicao = Math.min(...indicesDisposicao);
+
+  const limitantesDisposicao = participantes
+    .filter((_, indice) => indicesDisposicao[indice] === menorIndiceDisposicao)
+    .map((participante) => participante.nome);
+
+  linhas.push(
+    `Quem tem menos energia está com ${ROTULO_DISPOSICAO[ORDEM_DISPOSICAO[menorIndiceDisposicao]]}${quem(limitantesDisposicao)}, e isso combina com a atividade.`,
+  );
+
+  const comFome = participantes.some(
+    (participante) => participante.humor === "fome",
+  );
+
+  const animados = participantes.some(
+    (participante) => participante.humor === "animado",
+  );
+
+  if (comFome && (atividade.id === "restaurante" || atividade.id === "cafe")) {
+    linhas.push("Tem gente com fome no grupo, o que deu um empurrão extra.");
+  } else if (animados && atividade.disposicao.includes("alta")) {
+    linhas.push(
+      "Tem gente animada no grupo, o que favoreceu uma atividade mais agitada.",
+    );
+  }
+
+  return linhas;
+}
+
+export type MembroParaDecisao = {
+  uid: string;
+  rodada: number;
+  respostas: Omit<ParticipanteGrupo, "nome"> | null;
+  nome: string;
+  votoTentativa: number;
+  votoValor: "topo" | "nao" | null;
+};
+
+export function participantesDaRodada(
+  membros: MembroParaDecisao[],
+  rodada: number,
+): ParticipanteGrupo[] {
+  return [...membros]
+    .filter((membro) => membro.respostas !== null && membro.rodada === rodada)
+    .sort((a, b) => (a.uid < b.uid ? -1 : 1))
+    .map((membro) => ({ nome: membro.nome, ...membro.respostas! }));
+}
+
+export function sortearParaSala(
+  codigo: string,
+  rodada: number,
+  tentativa: number,
+  participantes: ParticipanteGrupo[],
+  excluirIds: string[],
+) {
+  return escolherAtividadeDoGrupo(
+    participantes,
+    criarSorteioDeterministico(`${codigo}-${rodada}-${tentativa}`),
+    excluirIds,
+  );
+}
+
+export function apurarVotacao(
+  membros: MembroParaDecisao[],
+  tentativa: number,
+): "aguardando" | "confirmar" | "girar-de-novo" {
+  if (membros.length === 0) {
+    return "aguardando";
+  }
+
+  const todosVotaram = membros.every(
+    (membro) => membro.votoValor !== null && membro.votoTentativa === tentativa,
+  );
+
+  if (!todosVotaram) {
+    return "aguardando";
+  }
+
+  const topo = membros.filter((membro) => membro.votoValor === "topo").length;
+
+  return topo * 2 > membros.length ? "confirmar" : "girar-de-novo";
 }

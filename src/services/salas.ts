@@ -1,27 +1,29 @@
 import {
-  arrayRemove,
-  arrayUnion,
-  collection,
-  doc,
-  DocumentData,
-  getDoc,
-  getDocs,
-  onSnapshot,
-  serverTimestamp,
-  Unsubscribe,
-  updateDoc,
-  writeBatch,
+    arrayRemove,
+    arrayUnion,
+    collection,
+    doc,
+    DocumentData,
+    getDoc,
+    getDocs,
+    onSnapshot,
+    query,
+    serverTimestamp,
+    Unsubscribe,
+    updateDoc,
+    where,
+    writeBatch,
 } from "firebase/firestore";
 
 import {
-  Disposicao,
-  GastoOpcao,
-  Humor,
-  OPCOES_DISPOSICAO,
-  OPCOES_GASTO,
-  OPCOES_HUMOR,
-  OPCOES_TEMPO,
-  TempoOpcao,
+    Disposicao,
+    GastoOpcao,
+    Humor,
+    OPCOES_DISPOSICAO,
+    OPCOES_GASTO,
+    OPCOES_HUMOR,
+    OPCOES_TEMPO,
+    TempoOpcao,
 } from "../constants/opcoesRoleta";
 import { gerarCodigo, normalizarCodigo } from "../utils/codigos";
 import { obterFirestore } from "./firebase";
@@ -45,7 +47,24 @@ export type ResultadoSala = {
   atividadeId: string;
   atividadeNome: string;
   semFiltro: boolean;
+  tentativa?: number;
 };
+
+export type LocalSala = {
+  id: string;
+  nome: string;
+  latitude: number;
+  longitude: number;
+  endereco: string;
+};
+
+export type ItemHistorico = {
+  rodada: number;
+  atividadeId: string;
+  atividadeNome: string;
+};
+
+export const PRAZO_RODADA_MS = 5 * 60 * 1000;
 
 export type Sala = {
   codigo: string;
@@ -57,6 +76,20 @@ export type Sala = {
   estado: EstadoSala;
   rodada: number;
   resultado: ResultadoSala | null;
+  discreto: boolean;
+  prazoEm: number;
+  tentativa: number;
+  vetadas: string[];
+  confirmada: boolean;
+  historico: ItemHistorico[];
+  ultimaAtividadeId: string;
+  locais: LocalSala[];
+  localEscolhidoId: string;
+};
+
+export type VotoSala = {
+  tentativa: number;
+  valor: "topo" | "nao";
 };
 
 export type MembroSala = {
@@ -66,6 +99,9 @@ export type MembroSala = {
   respostas: Respostas | null;
   progresso: number;
   progressoRodada: number;
+  voto: VotoSala | null;
+  votoLocal: string;
+  visto: number;
 };
 
 export type Usuario = {
@@ -100,8 +136,32 @@ function converterSala(dados: DocumentData): Sala {
             atividadeId: String(resultado.atividadeId),
             atividadeNome: String(resultado.atividadeNome ?? ""),
             semFiltro: resultado.semFiltro === true,
+            tentativa: Number(resultado.tentativa) || 1,
           }
         : null,
+    discreto: dados.discreto === true,
+    prazoEm: Number(dados.prazoEm) || 0,
+    tentativa: Number(dados.tentativa) || 0,
+    vetadas: Array.isArray(dados.vetadas) ? dados.vetadas.map(String) : [],
+    confirmada: dados.confirmada === true,
+    historico: Array.isArray(dados.historico)
+      ? dados.historico.map((item: Record<string, unknown>) => ({
+          rodada: Number(item.rodada) || 0,
+          atividadeId: String(item.atividadeId ?? ""),
+          atividadeNome: String(item.atividadeNome ?? ""),
+        }))
+      : [],
+    ultimaAtividadeId: String(dados.ultimaAtividadeId ?? ""),
+    locais: Array.isArray(dados.locais)
+      ? dados.locais.map((local: Record<string, unknown>) => ({
+          id: String(local.id ?? ""),
+          nome: String(local.nome ?? ""),
+          latitude: Number(local.latitude) || 0,
+          longitude: Number(local.longitude) || 0,
+          endereco: String(local.endereco ?? ""),
+        }))
+      : [],
+    localEscolhidoId: String(dados.localEscolhidoId ?? ""),
   };
 }
 
@@ -139,6 +199,20 @@ function converterMembro(uid: string, dados: DocumentData): MembroSala {
     respostas: converterRespostas(dados.respostas),
     progresso: Number(dados.progresso) || 0,
     progressoRodada: Number(dados.progressoRodada) || 0,
+    voto:
+      dados.voto &&
+      typeof dados.voto === "object" &&
+      (dados.voto.valor === "topo" || dados.voto.valor === "nao")
+        ? {
+            tentativa: Number(dados.voto.tentativa) || 0,
+            valor: dados.voto.valor,
+          }
+        : null,
+    votoLocal: String(dados.votoLocal ?? ""),
+    visto:
+      dados.visto && typeof dados.visto.toMillis === "function"
+        ? dados.visto.toMillis()
+        : 0,
   };
 }
 
@@ -245,12 +319,17 @@ export async function entrarNaSala(
   return codigo;
 }
 
-export async function sairDaSala(codigo: string, uid: string, ehDono: boolean) {
+export async function sairDaSala(
+  codigo: string,
+  uid: string,
+  ehDono: boolean,
+  proximoDono?: Usuario,
+) {
   const bd = obterFirestore();
 
   const referencia = doc(bd, "salas", codigo);
 
-  if (ehDono) {
+  if (ehDono && !proximoDono) {
     await updateDoc(referencia, { estado: "encerrada" });
 
     return;
@@ -258,11 +337,51 @@ export async function sairDaSala(codigo: string, uid: string, ehDono: boolean) {
 
   const lote = writeBatch(bd);
 
-  lote.update(referencia, { membrosUids: arrayRemove(uid) });
+  if (ehDono && proximoDono) {
+    lote.update(referencia, {
+      donoUid: proximoDono.uid,
+      donoNome: proximoDono.nome,
+      membrosUids: arrayRemove(uid),
+    });
+  } else {
+    lote.update(referencia, { membrosUids: arrayRemove(uid) });
+  }
 
   lote.delete(doc(bd, "salas", codigo, "membros", uid));
 
   await lote.commit();
+}
+
+export async function removerParticipante(codigo: string, uid: string) {
+  const bd = obterFirestore();
+
+  const lote = writeBatch(bd);
+
+  lote.update(doc(bd, "salas", codigo), { membrosUids: arrayRemove(uid) });
+
+  lote.delete(doc(bd, "salas", codigo, "membros", uid));
+
+  await lote.commit();
+}
+
+export function observarMinhasSalas(
+  uid: string,
+  aoMudar: (salas: Sala[]) => void,
+  aoErro?: (erro: unknown) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(
+      collection(obterFirestore(), "salas"),
+      where("membrosUids", "array-contains", uid),
+    ),
+    (instantaneo) =>
+      aoMudar(
+        instantaneo.docs
+          .map((documento) => converterSala(documento.data()))
+          .filter((sala) => sala.estado !== "encerrada"),
+      ),
+    (erro) => aoErro?.(erro),
+  );
 }
 
 export function observarSala(
@@ -300,6 +419,12 @@ export async function iniciarRodada(codigo: string, rodadaAtual: number) {
     estado: "respondendo",
     rodada: rodadaAtual + 1,
     resultado: null,
+    tentativa: 0,
+    vetadas: [],
+    confirmada: false,
+    locais: [],
+    localEscolhidoId: "",
+    prazoEm: Date.now() + PRAZO_RODADA_MS,
   });
 }
 
@@ -333,7 +458,85 @@ export async function definirResultado(
 ) {
   await updateDoc(doc(obterFirestore(), "salas", codigo), {
     estado: "resultado",
-    resultado,
+    resultado: { ...resultado, tentativa: 1 },
+    tentativa: 1,
+  });
+}
+
+export async function girarDeNovo(
+  codigo: string,
+  resultado: ResultadoSala,
+  tentativa: number,
+  vetadas: string[],
+) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo), {
+    resultado: { ...resultado, tentativa },
+    tentativa,
+    vetadas,
+  });
+}
+
+export async function confirmarResultado(
+  codigo: string,
+  rodada: number,
+  resultado: ResultadoSala,
+  historicoAtual: ItemHistorico[],
+) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo), {
+    confirmada: true,
+    ultimaAtividadeId: resultado.atividadeId,
+    historico: [
+      ...historicoAtual,
+      {
+        rodada,
+        atividadeId: resultado.atividadeId,
+        atividadeNome: resultado.atividadeNome,
+      },
+    ].slice(-10),
+  });
+}
+
+export async function votarNoResultado(
+  codigo: string,
+  uid: string,
+  tentativa: number,
+  valor: "topo" | "nao",
+) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo, "membros", uid), {
+    voto: { tentativa, valor },
+  });
+}
+
+export async function definirDiscreto(codigo: string, discreto: boolean) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo), { discreto });
+}
+
+export async function publicarLocais(codigo: string, locais: LocalSala[]) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo), {
+    locais: locais.slice(0, 5),
+    localEscolhidoId: "",
+  });
+}
+
+export async function votarNoLocal(
+  codigo: string,
+  uid: string,
+  localId: string,
+) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo, "membros", uid), {
+    votoLocal: localId,
+  });
+}
+
+export async function escolherLocal(codigo: string, localId: string) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo), {
+    localEscolhidoId: localId,
+  });
+}
+
+export async function registrarPresenca(codigo: string, uid: string) {
+  await updateDoc(doc(obterFirestore(), "salas", codigo, "membros", uid), {
+    visto: serverTimestamp(),
   });
 }
 

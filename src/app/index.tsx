@@ -19,6 +19,7 @@ import {
 import { useSessao } from "../context/SessaoContext";
 
 import Botao from "../components/Botao";
+import ExplicacaoResultado from "../components/ExplicacaoResultado";
 import ParticipanteItem from "../components/ParticipanteItem";
 import ResultadoEventos from "../components/ResultadoEventos";
 import ResultadoFilmes from "../components/ResultadoFilmes";
@@ -43,8 +44,8 @@ import {
 import { salvarSessao } from "../services/backend";
 import { buscarEventos, Evento } from "../services/eventos";
 import { buscarFilmes, Filme } from "../services/filmes";
-import { notificar } from "../services/notificar";
 import { buscarReceitas, Receita } from "../services/receitas";
+import { notificar } from "../services/notificar";
 import { carregarSalaParaResultado } from "../services/salas";
 import { tocarSom } from "../services/sons";
 
@@ -123,37 +124,37 @@ const OPCOES_GASTO: {
   rotulo: string;
   categoria: Gasto;
 }[] = [
-  {
-    valor: "R$ 0",
-    botao: "R$ 0 — Hoje não sai dinheiro",
-    rotulo: "R$ 0",
-    categoria: "nada",
-  },
-  {
-    valor: "até 30",
-    botao: "Até R$ 30",
-    rotulo: "Até R$ 30",
-    categoria: "pouco",
-  },
-  {
-    valor: "até 60",
-    botao: "Até R$ 60",
-    rotulo: "Até R$ 60",
-    categoria: "medio",
-  },
-  {
-    valor: "até 100",
-    botao: "Até R$ 100",
-    rotulo: "Até R$ 100",
-    categoria: "livre",
-  },
-  {
-    valor: "sem limite",
-    botao: "Hoje eu posso gastar",
-    rotulo: "Sem limite",
-    categoria: "livre",
-  },
-];
+    {
+      valor: "R$ 0",
+      botao: "R$ 0 — Hoje não sai dinheiro",
+      rotulo: "R$ 0",
+      categoria: "nada",
+    },
+    {
+      valor: "até 30",
+      botao: "Até R$ 30",
+      rotulo: "Até R$ 30",
+      categoria: "pouco",
+    },
+    {
+      valor: "até 60",
+      botao: "Até R$ 60",
+      rotulo: "Até R$ 60",
+      categoria: "medio",
+    },
+    {
+      valor: "até 100",
+      botao: "Até R$ 100",
+      rotulo: "Até R$ 100",
+      categoria: "livre",
+    },
+    {
+      valor: "sem limite",
+      botao: "Hoje eu posso gastar",
+      rotulo: "Sem limite",
+      categoria: "livre",
+    },
+  ];
 
 const OPCOES_DISPOSICAO: { valor: Disposicao; rotulo: string }[] = [
   { valor: "baixa", rotulo: "Pouca disposição" },
@@ -2454,6 +2455,29 @@ export default function Index() {
                       Nada combinou perfeitamente com as respostas de vocês,
                       então a roleta improvisou.
                     </Texto>
+                  )}
+
+                  {atividadeEscolhida && !atividadeSemFiltro && (
+                    <ExplicacaoResultado
+                      participantes={participantes.flatMap((item) =>
+                        item.humor !== "" &&
+                        item.gasto !== "" &&
+                        item.disposicao !== "" &&
+                        item.tempo !== ""
+                          ? [
+                              {
+                                nome: item.nome,
+                                humor: item.humor,
+                                gasto: item.gasto,
+                                disposicao: item.disposicao,
+                                tempo: item.tempo,
+                              },
+                            ]
+                          : [],
+                      )}
+                      atividade={atividadeEscolhida}
+                      semFiltro={false}
+                    />
                   )}
 
                   <Texto style={styles.pergunta}>Tempo disponível:</Texto>

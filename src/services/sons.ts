@@ -1,8 +1,4 @@
-import {
-    createAudioPlayer,
-    setAudioModeAsync,
-    type AudioPlayer,
-} from "expo-audio";
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
 
 export type NomeSom =
   | "clique"
@@ -57,7 +53,9 @@ function configurarModo() {
     Promise.resolve(setAudioModeAsync({ playsInSilentMode: true })).catch(
       () => undefined,
     );
-  } catch {}
+  } catch {
+    // segue sem alterar o modo de áudio
+  }
 }
 
 function obterJogador(nome: NomeSom) {

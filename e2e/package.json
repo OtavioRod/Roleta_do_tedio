@@ -1,0 +1,13 @@
+{
+  "name": "roleta-do-tedio-e2e",
+  "private": true,
+  "scripts": {
+    "instalar-navegadores": "playwright install --with-deps chromium",
+    "test": "playwright test",
+    "test:acessibilidade": "playwright test acessibilidade"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.49.0"
+  }
+}

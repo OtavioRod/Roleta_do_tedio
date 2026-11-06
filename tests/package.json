@@ -1,0 +1,10 @@
+{
+  "name": "roleta-do-tedio-testes-unitarios",
+  "private": true,
+  "scripts": {
+    "test": "tsx --test \"unit/*.test.ts\" \"../src/utils/validacoes.test.ts\""
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0"
+  }
+}

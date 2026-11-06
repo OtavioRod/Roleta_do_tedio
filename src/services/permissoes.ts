@@ -40,6 +40,11 @@ async function carregarNotificacoes() {
 }
 
 let comportamentoConfigurado = false;
+let salaAbertaAgora: string | null = null;
+
+export function definirSalaAberta(codigo: string | null) {
+  salaAbertaAgora = codigo;
+}
 
 export async function configurarNotificacoes() {
   if (Platform.OS === "web" || comportamentoConfigurado) {
@@ -54,12 +59,26 @@ export async function configurarNotificacoes() {
 
   try {
     modulo.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+      handleNotification: async (notificacao) => {
+        const dados = notificacao.request.content.data as
+          | Record<string, unknown>
+          | undefined;
+
+        // Com o app aberto, o aviso na tela e o som já cobrem a sala atual,
+        // convites e pedidos de amizade; mostrar de novo seria duplicado.
+        const jaCoberta =
+          (typeof dados?.salaCodigo === "string" &&
+            dados.salaCodigo === salaAbertaAgora) ||
+          dados?.tipo === "convite" ||
+          dados?.tipo === "amizade";
+
+        return {
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+          shouldShowBanner: !jaCoberta,
+          shouldShowList: !jaCoberta,
+        };
+      },
     });
 
     comportamentoConfigurado = true;

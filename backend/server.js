@@ -50,6 +50,14 @@ async function consultarServidorOverpass(servidor, consulta) {
       throw new Error("Resposta inválida do Overpass.");
     }
 
+    if (
+      dados.elements.length === 0 &&
+      typeof dados.remark === "string" &&
+      /error|timed out|out of memory|rate/i.test(dados.remark)
+    ) {
+      throw new Error(`Overpass não concluiu a busca: ${dados.remark}`);
+    }
+
     console.log(`Sucesso usando: ${servidor}`);
 
     console.log(`Elementos encontrados em ${servidor}:`, dados.elements.length);
@@ -70,15 +78,73 @@ async function consultarServidorOverpass(servidor, consulta) {
   }
 }
 
+const ESPERA_RESPOSTA_VAZIA_MS =
+  Number(process.env.OVERPASS_ESPERA_VAZIA_MS) || 8000;
+
+function primeiraRespostaComResultado(tentativas) {
+  return new Promise((resolve, reject) => {
+    let pendentes = tentativas.length;
+    let vazia = null;
+    let temporizador = null;
+    let resolvido = false;
+
+    const concluir = (valor) => {
+      if (resolvido) {
+        return;
+      }
+
+      resolvido = true;
+      clearTimeout(temporizador);
+      resolve(valor);
+    };
+
+    const encerrarUma = () => {
+      pendentes -= 1;
+
+      if (pendentes === 0 && !resolvido) {
+        if (vazia) {
+          concluir(vazia);
+        } else {
+          resolvido = true;
+          clearTimeout(temporizador);
+          reject(new Error("Todos os servidores Overpass falharam."));
+        }
+      }
+    };
+
+    tentativas.forEach((tentativa) => {
+      tentativa
+        .then((dados) => {
+          if (dados.elements.length > 0) {
+            concluir(dados);
+
+            return;
+          }
+
+          if (!vazia) {
+            vazia = dados;
+
+            temporizador = setTimeout(() => {
+              if (vazia) {
+                concluir(vazia);
+              }
+            }, ESPERA_RESPOSTA_VAZIA_MS);
+          }
+
+          encerrarUma();
+        })
+        .catch(() => encerrarUma());
+    });
+  });
+}
+
 async function consultarOverpass(consulta) {
   const servidores = [
     "https://overpass.private.coffee/api/interpreter",
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
-    "https://overpass.osm.jp/api/interpreter",
     "https://overpass.openstreetmap.fr/api/interpreter",
-    "https://overpass.osm.ch/api/interpreter",
   ];
 
   console.log("Iniciando consultas Overpass em paralelo...");
@@ -88,7 +154,7 @@ async function consultarOverpass(consulta) {
   );
 
   try {
-    const resultado = await Promise.any(tentativas);
+    const resultado = await primeiraRespostaComResultado(tentativas);
 
     console.log("Primeiro servidor Overpass respondeu com sucesso.");
 
@@ -104,11 +170,24 @@ app.post("/locais", async (req, res) => {
   try {
     const { latitude, longitude, tipo, raio = 5000, filtros } = req.body;
 
+    const filtroValido = (filtro) =>
+      typeof filtro === "string" &&
+      /^(node|way|relation|nwr)(\["[a-z_:]+"="[a-z_ ]+"\])+$/.test(filtro);
+
     if (
       typeof latitude !== "number" ||
       typeof longitude !== "number" ||
+      !Number.isFinite(latitude) ||
+      !Number.isFinite(longitude) ||
+      Math.abs(latitude) > 90 ||
+      Math.abs(longitude) > 180 ||
+      typeof raio !== "number" ||
+      raio < 500 ||
+      raio > 30000 ||
       !Array.isArray(filtros) ||
-      filtros.length === 0
+      filtros.length === 0 ||
+      filtros.length > 12 ||
+      !filtros.every(filtroValido)
     ) {
       return res.status(400).json({
         mensagem: "Dados inválidos para busca de locais.",
@@ -158,7 +237,9 @@ app.post("/locais", async (req, res) => {
 
     console.log("Elementos encontrados:", dados.elements.length);
 
-    cacheLocais.set(chave, { quando: Date.now(), dados });
+    if (dados.elements.length > 0) {
+      cacheLocais.set(chave, { quando: Date.now(), dados });
+    }
 
     res.json(dados);
   } catch (error) {

@@ -1,29 +1,30 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import {
-    AccessibilityInfo,
-    Platform,
-    ScrollView,
-    StyleProp,
-    StyleSheet,
-    Text,
-    TextStyle,
-    View,
+  AccessibilityInfo,
+  Platform,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextStyle,
+  View,
 } from "react-native";
 
 import {
-    Disposicao,
-    GastoOpcao,
-    Humor,
-    OPCOES_DISPOSICAO,
-    OPCOES_GASTO,
-    OPCOES_HUMOR,
-    OPCOES_TEMPO,
-    TempoOpcao,
+  Disposicao,
+  GastoOpcao,
+  Humor,
+  OPCOES_DISPOSICAO,
+  OPCOES_GASTO,
+  OPCOES_HUMOR,
+  OPCOES_TEMPO,
+  TempoOpcao,
 } from "../constants/opcoesRoleta";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { Respostas } from "../services/salas";
 import { tocarSom } from "../services/sons";
 import Botao from "./Botao";
+import ContagemPrazo from "./ContagemPrazo";
 import Texto from "./Texto";
 
 const VELOCIDADE_DIGITACAO = 18;
@@ -254,6 +255,8 @@ type Props = {
   aoProgresso: (perguntasRespondidas: number) => void;
   aoFinalizar: (respostas: Respostas) => void;
   aoSair: () => void;
+  ultimasRespostas?: Respostas | null;
+  prazoEm?: number;
 };
 
 export default function PerguntasRoleta({
@@ -263,6 +266,8 @@ export default function PerguntasRoleta({
   aoProgresso,
   aoFinalizar,
   aoSair,
+  ultimasRespostas = null,
+  prazoEm = 0,
 }: Props) {
   const { cores } = usePreferencias();
 
@@ -339,6 +344,22 @@ export default function PerguntasRoleta({
     aoProgresso(4);
   }
 
+  function reaproveitarRespostas() {
+    if (!ultimasRespostas || envioAutomaticoFeito.current) {
+      return;
+    }
+
+    envioAutomaticoFeito.current = true;
+
+    setHumor(ultimasRespostas.humor);
+    setGasto(ultimasRespostas.gasto);
+    setDisposicao(ultimasRespostas.disposicao);
+    setTempo(ultimasRespostas.tempo);
+
+    aoProgresso(4);
+    aoFinalizar(ultimasRespostas);
+  }
+
   const rodape = (
     <View style={styles.rodape}>
       {erro ? (
@@ -357,11 +378,24 @@ export default function PerguntasRoleta({
   if (etapa === "humor") {
     return (
       <Tela>
+        <ContagemPrazo prazoEm={prazoEm} />
+
         <PerguntaAnimada
           titulo={`Agora é pessoal, ${nome}`}
           descricao="Como você está agora?"
           descricaoMenor="Seja sincero. A roleta precisa saber com quem está lidando."
         />
+
+        {ultimasRespostas ? (
+          <View style={styles.opcaoBotao}>
+            <Botao
+              titulo="Usar as mesmas respostas da última rodada"
+              secundario
+              onPress={reaproveitarRespostas}
+              desabilitado={enviando}
+            />
+          </View>
+        ) : null}
 
         {OPCOES_HUMOR.map((opcao) => (
           <View key={opcao.valor} style={styles.opcaoBotao}>
