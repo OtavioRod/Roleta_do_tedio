@@ -28,9 +28,7 @@ export async function carregarPreferenciasAudio(): Promise<PreferenciasAudio> {
         vibracao: dados.vibracao !== false,
       };
     }
-  } catch {
-    // mantém os valores padrão
-  }
+  } catch {}
 
   definirSomAtivo(atuais.som);
 
@@ -44,9 +42,7 @@ export async function salvarPreferenciasAudio(novas: PreferenciasAudio) {
 
   try {
     await AsyncStorage.setItem(CHAVE_ARMAZENAMENTO, JSON.stringify(novas));
-  } catch {
-    // a preferência continua valendo nesta sessão
-  }
+  } catch {}
 }
 
 export function vibrar(padrao: number | number[] = 200) {
@@ -64,7 +60,5 @@ export function vibrar(padrao: number | number[] = 200) {
     }
 
     Vibration.vibrate(padrao);
-  } catch {
-    // aparelho sem vibração
-  }
+  } catch {}
 }

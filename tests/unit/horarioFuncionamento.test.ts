@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { avaliarHorario, cabeNoTempo } from "../../src/utils/horarioFuncionamento";
+import {
+  avaliarHorario,
+  cabeNoTempo,
+} from "../../src/utils/horarioFuncionamento";
 
-// 3 de novembro de 2026 é terça-feira.
 const terca = (hora: number, minuto = 0) => new Date(2026, 10, 3, hora, minuto);
 const sabadoMadrugada = new Date(2026, 10, 7, 1, 0);
 

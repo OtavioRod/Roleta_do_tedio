@@ -21,8 +21,6 @@ export function extrairCodigoDeLink(url: string | null | undefined) {
   return codigo.length >= 4 ? codigo : null;
 }
 
-// Na web, o endereço de entrada é capturado já na importação, antes de o
-// roteador redirecionar quem ainda não fez login.
 let pendenteEmMemoria: string | null =
   Platform.OS === "web" && typeof window !== "undefined"
     ? extrairCodigoDeLink(window.location.href)
@@ -46,9 +44,7 @@ export async function guardarSalaPendente(codigo: string) {
 
   try {
     await AsyncStorage.setItem(CHAVE_PENDENTE, codigo);
-  } catch {
-    // a memória ainda guarda o código nesta sessão
-  }
+  } catch {}
 }
 
 export async function lerEConsumirSalaPendente() {
@@ -66,9 +62,7 @@ export async function lerEConsumirSalaPendente() {
     if (guardado) {
       await AsyncStorage.removeItem(CHAVE_PENDENTE);
     }
-  } catch {
-    // segue com o que estiver na memória
-  }
+  } catch {}
 
   return codigo;
 }

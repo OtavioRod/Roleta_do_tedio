@@ -8,7 +8,7 @@ process.env.OVERPASS_ESPERA_VAZIA_MS = "60";
 const { after, before, beforeEach, describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 
-// --- Postgres simulado ------------------------------------------------------
+// --- Postgres simulado
 const consultasAoBanco = [];
 
 const poolSimulado = {
@@ -16,7 +16,9 @@ const poolSimulado = {
     consultasAoBanco.push({ sql, parametros });
 
     if (/INSERT/i.test(sql)) {
-      return { rows: [{ id: 1, atividade: parametros[0], modalidade: parametros[1] }] };
+      return {
+        rows: [{ id: 1, atividade: parametros[0], modalidade: parametros[1] }],
+      };
     }
 
     return { rows: [{ id: 1, atividade: "Café", modalidade: null }] };
@@ -32,7 +34,7 @@ require.cache[caminhoDb] = {
   exports: poolSimulado,
 };
 
-// --- Overpass simulado ------------------------------------------------------
+// --- Overpass simulado
 const ELEMENTO = {
   type: "node",
   id: 1,
@@ -87,7 +89,7 @@ global.fetch = async (url, opcoes) => {
   return comportamento();
 };
 
-// --- Servidor ---------------------------------------------------------------
+// --- Servidor
 const app = require("../server");
 
 let servidor;
@@ -98,7 +100,7 @@ const FILTROS = ['nwr["amenity"="cafe"]', 'nwr["shop"="coffee"]'];
 let proximaLatitude = -22.0;
 
 function corpoValido(extra = {}) {
-  proximaLatitude -= 0.01; // cada teste usa uma posição nova para não pegar cache
+  proximaLatitude -= 0.01;
 
   return {
     latitude: proximaLatitude,
@@ -180,12 +182,18 @@ describe("POST /locais — validação de entrada", () => {
       const { status } = await post("/locais", corpoValido(extra));
 
       assert.equal(status, 400);
-      assert.equal(chamadasOverpass, 0, "nem deveria ter consultado o Overpass");
+      assert.equal(
+        chamadasOverpass,
+        0,
+        "nem deveria ter consultado o Overpass",
+      );
     });
   }
 
   it("aceita todos os filtros que o app realmente usa", async () => {
-    definirOverpass({ "overpass-api.de": async () => responder({ elements: [ELEMENTO] }) });
+    definirOverpass({
+      "overpass-api.de": async () => responder({ elements: [ELEMENTO] }),
+    });
 
     const usados = [
       'nwr["amenity"="restaurant"]',
@@ -204,8 +212,6 @@ describe("POST /locais — validação de entrada", () => {
 
 describe("POST /locais — busca no Overpass", () => {
   it("[regressão] um espelho que responde vazio e rápido não vence quem tem resultado", async () => {
-    // Era o bug: espelhos regionais respondiam [] primeiro e o app dizia
-    // "Nenhuma opção foi encontrada".
     definirOverpass({
       "overpass.private.coffee": async () => responder({ elements: [] }),
       "overpass-api.de": async () => {
@@ -226,7 +232,8 @@ describe("POST /locais — busca no Overpass", () => {
       "overpass.private.coffee": async () =>
         responder({
           elements: [],
-          remark: 'runtime error: Query timed out in "query" at line 3 after 26 seconds.',
+          remark:
+            'runtime error: Query timed out in "query" at line 3 after 26 seconds.',
         }),
       "overpass.kumi.systems": async () => {
         await esperar(30);
@@ -264,7 +271,9 @@ describe("POST /locais — busca no Overpass", () => {
   });
 
   it("guarda no cache o que tem resultado", async () => {
-    definirOverpass({ "overpass-api.de": async () => responder({ elements: [ELEMENTO] }) });
+    definirOverpass({
+      "overpass-api.de": async () => responder({ elements: [ELEMENTO] }),
+    });
 
     const corpoFixo = corpoValido();
 
@@ -275,7 +284,11 @@ describe("POST /locais — busca no Overpass", () => {
     const segunda = await post("/locais", corpoFixo);
 
     assert.equal(segunda.status, 200);
-    assert.equal(chamadasOverpass, depoisDaPrimeira, "a segunda busca deveria vir do cache");
+    assert.equal(
+      chamadasOverpass,
+      depoisDaPrimeira,
+      "a segunda busca deveria vir do cache",
+    );
   });
 
   it("[regressão] não guarda no cache resultado vazio", async () => {
@@ -285,7 +298,9 @@ describe("POST /locais — busca no Overpass", () => {
 
     const depoisDaPrimeira = chamadasOverpass;
 
-    definirOverpass({ "overpass-api.de": async () => responder({ elements: [ELEMENTO] }) });
+    definirOverpass({
+      "overpass-api.de": async () => responder({ elements: [ELEMENTO] }),
+    });
 
     const segunda = await post("/locais", corpoFixo);
 
@@ -323,6 +338,8 @@ describe("/sessoes", () => {
     assert.ok(Array.isArray((await resposta.json()).sessoes));
   });
 
-  it.todo("GET /sessoes deveria exigir autenticação (hoje qualquer pessoa lista tudo)");
+  it.todo(
+    "GET /sessoes deveria exigir autenticação (hoje qualquer pessoa lista tudo)",
+  );
   it.todo("POST /sessoes deveria ter limite de requisições por IP");
 });

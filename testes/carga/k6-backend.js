@@ -1,19 +1,5 @@
-// Testes de carga, estresse, pico e resistência do backend (k6).
-//
-//   k6 run -e PERFIL=carga     -e URL=https://SEU-BACKEND testes/carga/k6-backend.js
-//   k6 run -e PERFIL=estresse  ...
-//   k6 run -e PERFIL=pico      ...
-//   k6 run -e PERFIL=resistencia ...
-//
-// ATENÇÃO
-//  - Rode contra um ambiente de TESTE (o /sessoes grava no banco só se ESCREVER=1).
-//  - /locais depende de servidores públicos do Overpass. Por padrão este teste usa
-//    sempre as mesmas coordenadas (respostas vêm do cache do backend) para NÃO
-//    sobrecarregar esses servidores. Com LOCAIS_FRIO=1 cada requisição usa uma
-//    posição nova e consulta o Overpass de verdade: use poucas VUs.
-
-import http from "k6/http";
 import { check, sleep } from "k6";
+import http from "k6/http";
 
 const URL_BASE = __ENV.URL || "http://localhost:3000";
 const ESCREVER = __ENV.ESCREVER === "1";
@@ -73,7 +59,10 @@ export default function () {
       raio: 5000,
       filtros: FILTROS,
     }),
-    { headers: { "Content-Type": "application/json" }, tags: { rota: "locais" } },
+    {
+      headers: { "Content-Type": "application/json" },
+      tags: { rota: "locais" },
+    },
   );
 
   check(locais, {
@@ -84,16 +73,24 @@ export default function () {
   const invalido = http.post(
     `${URL_BASE}/locais`,
     JSON.stringify({ latitude: 0, longitude: 0, raio: 1e9, filtros: ["x"] }),
-    { headers: { "Content-Type": "application/json" }, tags: { rota: "invalido" } },
+    {
+      headers: { "Content-Type": "application/json" },
+      tags: { rota: "invalido" },
+    },
   );
 
-  check(invalido, { "entrada inválida é recusada com 400": (r) => r.status === 400 });
+  check(invalido, {
+    "entrada inválida é recusada com 400": (r) => r.status === 400,
+  });
 
   if (ESCREVER) {
     const sessao = http.post(
       `${URL_BASE}/sessoes`,
       JSON.stringify({ atividade: "Teste de carga", modalidade: "k6" }),
-      { headers: { "Content-Type": "application/json" }, tags: { rota: "sessoes" } },
+      {
+        headers: { "Content-Type": "application/json" },
+        tags: { rota: "sessoes" },
+      },
     );
 
     check(sessao, { "sessão salva": (r) => r.status === 201 });

@@ -26,10 +26,6 @@ function igual(a, b) {
   return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 }
 
-// ---------------------------------------------------------------------------
-// Convites e amizades
-// ---------------------------------------------------------------------------
-
 exports.aoCriarConvite = onDocumentCreated("convites/{id}", async (evento) => {
   const convite = evento.data && evento.data.data();
 
@@ -76,10 +72,6 @@ exports.aoMudarAmizade = onDocumentWritten("amizades/{par}", async (evento) => {
     });
   }
 });
-
-// ---------------------------------------------------------------------------
-// Avisos da sala
-// ---------------------------------------------------------------------------
 
 exports.aoMudarSala = onDocumentUpdated("salas/{codigo}", async (evento) => {
   const antes = evento.data.before.data();
@@ -162,20 +154,18 @@ exports.aoMudarSala = onDocumentUpdated("salas/{codigo}", async (evento) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Resultado e votação calculados no servidor
-// ---------------------------------------------------------------------------
-
 exports.aoMudarMembro = onDocumentWritten(
   "salas/{codigo}/membros/{uid}",
   async (evento) => {
     const antes = evento.data.before.exists ? evento.data.before.data() : null;
     const depois = evento.data.after.exists ? evento.data.after.data() : null;
 
-    // Presença e progresso não mudam o resultado: não faz nada.
     if (
       !depois ||
-      (antes && igual(antes.respostas, depois.respostas) && igual(antes.voto, depois.voto) && antes.rodada === depois.rodada)
+      (antes &&
+        igual(antes.respostas, depois.respostas) &&
+        igual(antes.voto, depois.voto) &&
+        antes.rodada === depois.rodada)
     ) {
       return;
     }
@@ -197,7 +187,10 @@ exports.aoMudarMembro = onDocumentWritten(
         .filter((documento) => (sala.membrosUids || []).includes(documento.id))
         .map((documento) => ({ uid: documento.id, ...documento.data() }));
 
-      if (membros.length === 0 || membros.length !== (sala.membrosUids || []).length) {
+      if (
+        membros.length === 0 ||
+        membros.length !== (sala.membrosUids || []).length
+      ) {
         return;
       }
 
@@ -284,10 +277,6 @@ exports.aoMudarMembro = onDocumentWritten(
   },
 );
 
-// ---------------------------------------------------------------------------
-// Limpeza automática
-// ---------------------------------------------------------------------------
-
 exports.limpezaDiaria = onSchedule(
   { schedule: "every day 04:00", timeZone: "America/Sao_Paulo" },
   async () => {
@@ -295,7 +284,11 @@ exports.limpezaDiaria = onSchedule(
 
     const salasAntigas = await db
       .collection("salas")
-      .where("criadaEm", "<", admin.firestore.Timestamp.fromMillis(agora - 2 * 24 * 60 * 60 * 1000))
+      .where(
+        "criadaEm",
+        "<",
+        admin.firestore.Timestamp.fromMillis(agora - 2 * 24 * 60 * 60 * 1000),
+      )
       .limit(200)
       .get();
 
@@ -305,7 +298,11 @@ exports.limpezaDiaria = onSchedule(
 
     const convitesAntigos = await db
       .collection("convites")
-      .where("criadoEm", "<", admin.firestore.Timestamp.fromMillis(agora - 24 * 60 * 60 * 1000))
+      .where(
+        "criadoEm",
+        "<",
+        admin.firestore.Timestamp.fromMillis(agora - 24 * 60 * 60 * 1000),
+      )
       .limit(400)
       .get();
 

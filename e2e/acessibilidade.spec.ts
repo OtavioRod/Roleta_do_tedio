@@ -9,11 +9,15 @@ async function verificar(page: Page) {
     .analyze();
 
   const graves = resultado.violations.filter(
-    (violacao) => violacao.impact === "serious" || violacao.impact === "critical",
+    (violacao) =>
+      violacao.impact === "serious" || violacao.impact === "critical",
   );
 
   expect(
-    graves.map((violacao) => `${violacao.id}: ${violacao.help} (${violacao.nodes.length})`),
+    graves.map(
+      (violacao) =>
+        `${violacao.id}: ${violacao.help} (${violacao.nodes.length})`,
+    ),
   ).toEqual([]);
 }
 
@@ -63,7 +67,9 @@ test.describe("Acessibilidade automática (axe, WCAG 2.2 AA)", () => {
       await verificar(page);
     });
 
-    test("com movimento reduzido, as perguntas aparecem prontas", async ({ page }) => {
+    test("com movimento reduzido, as perguntas aparecem prontas", async ({
+      page,
+    }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
 
       await entrar(page);

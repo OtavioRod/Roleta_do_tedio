@@ -63,9 +63,10 @@ async function enviarPush(uids, { titulo, corpo, dados }) {
 
       const corpoResposta = await resposta.json();
 
-      const tickets = Array.isArray(corpoResposta.data) ? corpoResposta.data : [];
+      const tickets = Array.isArray(corpoResposta.data)
+        ? corpoResposta.data
+        : [];
 
-      // Aparelho que desinstalou o app: apaga o token para não insistir.
       await Promise.all(
         tickets.map((ticket, indice) =>
           ticket.status === "error" &&

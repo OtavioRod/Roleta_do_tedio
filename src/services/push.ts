@@ -69,7 +69,13 @@ export async function registrarPush(uid: string): Promise<boolean> {
     }
 
     await setDoc(
-      doc(obterFirestore(), "users", uid, "dispositivos", idDoDispositivo(token)),
+      doc(
+        obterFirestore(),
+        "users",
+        uid,
+        "dispositivos",
+        idDoDispositivo(token),
+      ),
       {
         token,
         plataforma: Platform.OS,
@@ -94,9 +100,13 @@ export async function removerPush(uid: string) {
     }
 
     await deleteDoc(
-      doc(obterFirestore(), "users", uid, "dispositivos", idDoDispositivo(token)),
+      doc(
+        obterFirestore(),
+        "users",
+        uid,
+        "dispositivos",
+        idDoDispositivo(token),
+      ),
     );
-  } catch {
-    // sem token para remover
-  }
+  } catch {}
 }

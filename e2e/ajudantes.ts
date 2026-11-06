@@ -23,17 +23,16 @@ export async function entrar(page: Page, numero: 1 | 2 = 1) {
 
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
 
-  // Depois do login o app pode pedir permissões; aceita o caminho mais curto.
-  await expect(
-    page.getByText("Roleta do Tédio").first(),
-  ).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Roleta do Tédio").first()).toBeVisible({
+    timeout: 30_000,
+  });
 }
 
-const AVANCAR = /^(Descobrir|Continuar|Descobrir meu tempo|Enviar minhas respostas)$/;
+const AVANCAR =
+  /^(Descobrir|Continuar|Descobrir meu tempo|Enviar minhas respostas)$/;
 
 export async function responderPerguntas(page: Page) {
   for (let pergunta = 0; pergunta < 4; pergunta += 1) {
-    // As opções são botões; ignora os de apoio.
     await page
       .getByRole("button")
       .filter({ hasNotText: /Sair da sala|Usar as mesmas|Remover/ })
@@ -42,8 +41,12 @@ export async function responderPerguntas(page: Page) {
 
     const avancar = page.getByRole("button", { name: AVANCAR });
 
-    // A tela de transição avança sozinha em ~3 s; clicar acelera.
-    if (await avancar.first().isVisible().catch(() => false)) {
+    if (
+      await avancar
+        .first()
+        .isVisible()
+        .catch(() => false)
+    ) {
       await avancar.first().click();
     }
   }
