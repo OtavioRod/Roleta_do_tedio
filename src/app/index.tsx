@@ -27,6 +27,7 @@ import ResultadoJogos from "../components/ResultadoJogos";
 import ResultadoLocais from "../components/ResultadoLocais";
 import ResultadoReceitas from "../components/ResultadoReceitas";
 import RoletaAtividades from "../components/RoletaAtividades";
+import RoletaEstatica from "../components/RoletaEstatica";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 
@@ -44,8 +45,8 @@ import {
 import { salvarSessao } from "../services/backend";
 import { buscarEventos, Evento } from "../services/eventos";
 import { buscarFilmes, Filme } from "../services/filmes";
-import { buscarReceitas, Receita } from "../services/receitas";
 import { notificar } from "../services/notificar";
+import { buscarReceitas, Receita } from "../services/receitas";
 import { carregarSalaParaResultado } from "../services/salas";
 import { tocarSom } from "../services/sons";
 
@@ -124,37 +125,37 @@ const OPCOES_GASTO: {
   rotulo: string;
   categoria: Gasto;
 }[] = [
-    {
-      valor: "R$ 0",
-      botao: "R$ 0 — Hoje não sai dinheiro",
-      rotulo: "R$ 0",
-      categoria: "nada",
-    },
-    {
-      valor: "até 30",
-      botao: "Até R$ 30",
-      rotulo: "Até R$ 30",
-      categoria: "pouco",
-    },
-    {
-      valor: "até 60",
-      botao: "Até R$ 60",
-      rotulo: "Até R$ 60",
-      categoria: "medio",
-    },
-    {
-      valor: "até 100",
-      botao: "Até R$ 100",
-      rotulo: "Até R$ 100",
-      categoria: "livre",
-    },
-    {
-      valor: "sem limite",
-      botao: "Hoje eu posso gastar",
-      rotulo: "Sem limite",
-      categoria: "livre",
-    },
-  ];
+  {
+    valor: "R$ 0",
+    botao: "R$ 0 — Hoje não sai dinheiro",
+    rotulo: "R$ 0",
+    categoria: "nada",
+  },
+  {
+    valor: "até 30",
+    botao: "Até R$ 30",
+    rotulo: "Até R$ 30",
+    categoria: "pouco",
+  },
+  {
+    valor: "até 60",
+    botao: "Até R$ 60",
+    rotulo: "Até R$ 60",
+    categoria: "medio",
+  },
+  {
+    valor: "até 100",
+    botao: "Até R$ 100",
+    rotulo: "Até R$ 100",
+    categoria: "livre",
+  },
+  {
+    valor: "sem limite",
+    botao: "Hoje eu posso gastar",
+    rotulo: "Sem limite",
+    categoria: "livre",
+  },
+];
 
 const OPCOES_DISPOSICAO: { valor: Disposicao; rotulo: string }[] = [
   { valor: "baixa", rotulo: "Pouca disposição" },
@@ -597,7 +598,6 @@ function Carregando({ texto, grande }: CarregandoProps) {
 export default function Index() {
   const { cores } = usePreferencias();
   const { executarSemExpirar, usuario, perfil } = useSessao();
-  //const { executarSemExpirar } = useSessao();
 
   const router = useRouter();
 
@@ -2075,8 +2075,25 @@ export default function Index() {
 
         {!iniciou ? (
           <Tela key="inicio">
-            <Texto cabecalho style={styles.titulo}>
-              Roleta do Tédio
+            <View
+              style={[
+                styles.seloHome,
+                { backgroundColor: cores.amarelo, borderColor: cores.borda },
+              ]}
+            >
+              <Texto librasIgnorado style={styles.textoSeloHome}>
+                😴 zero esforço mental™
+              </Texto>
+            </View>
+
+            <Texto cabecalho style={styles.tituloHome}>
+              Roleta do{" "}
+              <Texto
+                librasIgnorado
+                style={[styles.tituloHome, { color: cores.primaria }]}
+              >
+                Tédio
+              </Texto>
             </Texto>
 
             <Texto style={styles.descricao}>
@@ -2086,6 +2103,10 @@ export default function Index() {
             <Texto style={styles.descricao}>
               Perfeito. Aparentemente pensar virou trabalho demais.
             </Texto>
+
+            <RoletaEstatica />
+
+            <View style={styles.espacoRoleta} />
 
             <Botao titulo="Começar" onPress={() => setIniciou(true)} />
 
@@ -2881,11 +2902,37 @@ const styles = StyleSheet.create({
 
   titulo: {
     width: "100%",
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 34,
     textAlign: "center",
     marginBottom: 15,
-    lineHeight: 34,
+    lineHeight: 40,
+  },
+
+  tituloHome: {
+    width: "100%",
+    fontSize: 46,
+    textAlign: "center",
+    marginBottom: 14,
+    lineHeight: 50,
+  },
+
+  seloHome: {
+    alignSelf: "center",
+    borderWidth: 2,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+
+  textoSeloHome: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1E130F",
+  },
+
+  espacoRoleta: {
+    height: 24,
   },
 
   descricao: {

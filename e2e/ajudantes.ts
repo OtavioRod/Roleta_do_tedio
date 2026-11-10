@@ -19,7 +19,7 @@ export async function entrar(page: Page, numero: 1 | 2 = 1) {
   await page.goto("/entrar");
 
   await page.getByLabel("E-mail").fill(email!);
-  await page.getByLabel("Senha").fill(senha!);
+  await page.getByLabel("Senha", { exact: true }).fill(senha!);
 
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
 

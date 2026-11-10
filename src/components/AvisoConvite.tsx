@@ -5,15 +5,15 @@ import { StyleSheet, View } from "react-native";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
 import {
-    Convite,
-    observarConvitesRecebidos,
-    responderConvite,
+  Convite,
+  observarConvitesRecebidos,
+  responderConvite,
 } from "../services/convites";
 import { notificar } from "../services/notificar";
 import { entrarNaSala } from "../services/salas";
 import {
-    codigoErroSocial,
-    mensagemErroSocial,
+  codigoErroSocial,
+  mensagemErroSocial,
 } from "../utils/mensagensSociais";
 import Botao from "./Botao";
 import Texto from "./Texto";

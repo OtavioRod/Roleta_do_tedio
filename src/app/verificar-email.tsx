@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../components/Botao";
+import MarcaApp from "../components/MarcaApp";
+import Painel from "../components/Painel";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
@@ -76,57 +78,57 @@ export default function VerificarEmail() {
   return (
     <ScrollView contentContainerStyle={styles.conteudo}>
       <View style={styles.coluna}>
-        <Texto cabecalho style={styles.titulo}>
-          Confirme o seu e-mail
-        </Texto>
+        <Painel>
+          <MarcaApp titulo="Confirme o seu e-mail" />
 
-        <Texto style={styles.texto}>
-          Enviamos uma mensagem para {usuario?.email}. Toque no link dela para
-          confirmar que este endereço é seu.
-        </Texto>
-
-        <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
-          Esta tela confere sozinha a cada poucos segundos. Se a mensagem não
-          chegar, olhe a caixa de spam.
-        </Texto>
-
-        {mensagem !== "" && (
-          <Texto accessibilityRole="alert" style={styles.mensagem}>
-            {mensagem}
+          <Texto style={styles.texto}>
+            Enviamos uma mensagem para {usuario?.email}. Toque no link dela para
+            confirmar que este endereço é seu.
           </Texto>
-        )}
 
-        {erro !== "" && (
-          <Texto
-            accessibilityRole="alert"
-            style={[styles.mensagem, { color: cores.erro }]}
-          >
-            {erro}
+          <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
+            Esta tela confere sozinha a cada poucos segundos. Se a mensagem não
+            chegar, olhe a caixa de spam.
           </Texto>
-        )}
 
-        <Botao
-          titulo={conferindo ? "Conferindo..." : "Já confirmei"}
-          onPress={conferir}
-          desabilitado={conferindo}
-        />
+          {mensagem !== "" && (
+            <Texto accessibilityRole="alert" style={styles.mensagem}>
+              {mensagem}
+            </Texto>
+          )}
 
-        <View style={styles.espaco} />
+          {erro !== "" && (
+            <Texto
+              accessibilityRole="alert"
+              style={[styles.mensagem, { color: cores.erro }]}
+            >
+              {erro}
+            </Texto>
+          )}
 
-        <Botao
-          titulo={
-            espera > 0
-              ? `Reenviar e-mail (aguarde ${espera} s)`
-              : "Reenviar e-mail"
-          }
-          secundario
-          onPress={reenviar}
-          desabilitado={espera > 0}
-        />
+          <Botao
+            titulo={conferindo ? "Conferindo..." : "Já confirmei"}
+            onPress={conferir}
+            desabilitado={conferindo}
+          />
 
-        <View style={styles.espaco} />
+          <View style={styles.espaco} />
 
-        <Botao titulo="Sair" secundario onPress={sair} />
+          <Botao
+            titulo={
+              espera > 0
+                ? `Reenviar e-mail (aguarde ${espera} s)`
+                : "Reenviar e-mail"
+            }
+            secundario
+            onPress={reenviar}
+            desabilitado={espera > 0}
+          />
+
+          <View style={styles.espaco} />
+
+          <Botao titulo="Sair" secundario onPress={sair} />
+        </Painel>
       </View>
     </ScrollView>
   );

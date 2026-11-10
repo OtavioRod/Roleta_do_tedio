@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../components/Botao";
 import CampoFormulario from "../components/CampoFormulario";
+import Painel, { estiloPainel } from "../components/Painel";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
@@ -102,8 +103,8 @@ export default function Salas() {
         </Texto>
 
         <Texto style={[styles.intro, { color: cores.textoSecundario }]}>
-          Cada pessoa responde no próprio aparelho, e a roleta decide pelo grupo
-          todo.
+          Junte a galera numa sala e deixe a roleta levar a culpa. Cada pessoa
+          responde no próprio aparelho, e a roleta decide pelo grupo todo.
         </Texto>
 
         {minhasSalas.length > 0 && (
@@ -112,81 +113,108 @@ export default function Salas() {
               Minhas salas ativas
             </Texto>
 
-            {minhasSalas.map((sala) => (
+            {minhasSalas.map((sala, indice) => (
               <View
                 key={sala.codigo}
-                style={[styles.cartaoSala, { borderColor: cores.borda }]}
+                style={[styles.cartaoSala, estiloPainel(cores, true)]}
               >
-                <Texto style={styles.cartaoTitulo}>
-                  Sala {sala.codigo} ·{" "}
-                  {sala.tipo === "casal" ? "casal" : "amigos"}
-                </Texto>
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.icone,
+                    {
+                      backgroundColor: [cores.amarelo, cores.verde, cores.rosa][
+                        indice % 3
+                      ],
+                      borderColor: cores.borda,
+                    },
+                  ]}
+                >
+                  <Texto librasIgnorado style={styles.emoji}>
+                    🎲
+                  </Texto>
+                </View>
 
-                <Texto style={styles.cartaoTexto}>
-                  {sala.membrosUids.length} de {sala.limite} pessoas ·{" "}
-                  {ROTULO_ESTADO[sala.estado]}
-                </Texto>
+                <View style={styles.cartaoInfo}>
+                  <Texto style={styles.cartaoTitulo}>
+                    Sala {sala.codigo} ·{" "}
+                    {sala.tipo === "casal" ? "casal" : "amigos"}
+                  </Texto>
 
-                <Botao
-                  titulo="Voltar para a sala"
-                  onPress={() => abrirSala(sala.codigo)}
-                />
+                  <Texto
+                    style={[
+                      styles.cartaoTexto,
+                      { color: cores.textoSecundario },
+                    ]}
+                  >
+                    {sala.membrosUids.length} de {sala.limite} pessoas ·{" "}
+                    {ROTULO_ESTADO[sala.estado]}
+                  </Texto>
+
+                  <Botao
+                    titulo="Voltar para a sala"
+                    pequeno
+                    onPress={() => abrirSala(sala.codigo)}
+                  />
+                </View>
               </View>
             ))}
           </>
         )}
 
-        <Texto cabecalho style={styles.secao}>
-          Criar uma sala
-        </Texto>
-
-        <Botao
-          titulo="Sala de casal (2 pessoas)"
-          onPress={() => criar("casal")}
-          desabilitado={ocupado}
-        />
-
-        <View style={styles.espaco} />
-
-        <Botao
-          titulo="Sala de amigos (até 10 pessoas)"
-          onPress={() => criar("amigos")}
-          desabilitado={ocupado}
-        />
-
-        <Texto cabecalho style={styles.secao}>
-          Entrar com um código
-        </Texto>
-
-        <CampoFormulario
-          rotulo="Código da sala"
-          valor={codigo}
-          aoMudar={(texto) => {
-            setCodigo(normalizarCodigo(texto).slice(0, 6));
-            setErro("");
-          }}
-          aoEnviar={entrar}
-          maxLength={6}
-        />
-
-        <Botao
-          titulo="Entrar na sala"
-          onPress={entrar}
-          desabilitado={ocupado}
-        />
-
-        {erro !== "" && (
-          <Texto
-            accessibilityRole="alert"
-            style={[styles.erro, { color: cores.erro }]}
-          >
-            {erro}
+        <Painel>
+          <Texto cabecalho style={styles.secaoPainel}>
+            Criar uma sala
           </Texto>
-        )}
 
-        <Texto cabecalho style={styles.secao}>
-          Outras opções
-        </Texto>
+          <Botao
+            titulo="Sala de casal (2 pessoas)"
+            onPress={() => criar("casal")}
+            desabilitado={ocupado}
+          />
+
+          <View style={styles.espaco} />
+
+          <Botao
+            titulo="Sala de amigos (até 10 pessoas)"
+            onPress={() => criar("amigos")}
+            desabilitado={ocupado}
+          />
+        </Painel>
+
+        <Painel>
+          <Texto cabecalho style={styles.secaoPainel}>
+            Entrar com um código
+          </Texto>
+
+          <CampoFormulario
+            rotulo="Código da sala"
+            valor={codigo}
+            aoMudar={(texto) => {
+              setCodigo(normalizarCodigo(texto).slice(0, 6));
+              setErro("");
+            }}
+            aoEnviar={entrar}
+            maxLength={6}
+          />
+
+          <Botao
+            titulo="Entrar na sala"
+            secundario
+            onPress={entrar}
+            desabilitado={ocupado}
+          />
+
+          {erro !== "" && (
+            <Texto
+              accessibilityRole="alert"
+              style={[styles.erro, { color: cores.erro }]}
+            >
+              {erro}
+            </Texto>
+          )}
+        </Painel>
 
         <Botao
           titulo="Meus amigos"
@@ -220,22 +248,26 @@ const styles = StyleSheet.create({
   },
 
   titulo: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 40,
+    lineHeight: 44,
     marginBottom: 8,
   },
 
   intro: {
-    fontSize: 16,
-    lineHeight: 23,
-    marginBottom: 8,
+    fontSize: 17,
+    lineHeight: 24,
+    marginBottom: 14,
   },
 
   secao: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginTop: 20,
-    marginBottom: 10,
+    fontSize: 26,
+    marginTop: 12,
+    marginBottom: 14,
+  },
+
+  secaoPainel: {
+    fontSize: 24,
+    marginBottom: 14,
   },
 
   erro: {
@@ -245,20 +277,41 @@ const styles = StyleSheet.create({
   },
 
   espaco: {
-    height: 10,
+    height: 12,
   },
 
   cartaoSala: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    padding: 16,
+    marginBottom: 16,
+    marginRight: 6,
+  },
+
+  icone: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emoji: {
+    fontSize: 22,
+    lineHeight: 30,
+    color: "#1E130F",
+  },
+
+  cartaoInfo: {
+    flex: 1,
   },
 
   cartaoTitulo: {
-    fontSize: 17,
-    fontWeight: "bold",
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: "700",
+    marginBottom: 2,
   },
 
   cartaoTexto: {

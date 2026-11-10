@@ -10,29 +10,20 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Path, Text as SvgText } from "react-native-svg";
 
-import Texto from "./Texto";
+import { usePreferencias } from "../context/PreferenciasContext";
 import { Atividade } from "../data/atividades";
 import { vibrar } from "../services/preferenciasAudio";
 import { pararSom, tocarSom } from "../services/sons";
+import Texto from "./Texto";
 
 const TAMANHO = 300;
+const COR_TRACO = "#1E130F";
 const CENTRO = TAMANHO / 2;
 const RAIO = 145;
 const DURACAO_GIRO_MS = 6200;
 const DURACAO_RESULTADO_MS = 1000;
 const VOLTAS_COMPLETAS = 8;
 const MARGEM_DA_FATIA = 0.1;
-
-const CORES_FATIAS = [
-  "#1769aa",
-  "#008577",
-  "#7048a8",
-  "#c45b17",
-  "#b8325e",
-  "#4267a9",
-  "#587b21",
-  "#775548",
-];
 
 const ROTULOS: Record<string, string> = {
   cafe: "Café",
@@ -76,8 +67,11 @@ export default function RoletaAtividades({
   posicaoFixa,
 }: RoletaAtividadesProps) {
   const [parada, setParada] = useState(false);
-  const temporizadorResultado =
-    useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { cores } = usePreferencias();
+  const fatias = [cores.primaria, cores.amarelo, cores.verde, cores.rosa];
+  const temporizadorResultado = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
   const rotacao = useSharedValue(0);
   const estiloRotacao = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotacao.value}deg` }],
@@ -89,15 +83,9 @@ export default function RoletaAtividades({
       (atividade) => (ROTULOS[atividade.id] ?? atividade.nome).length,
     ),
   );
-  const espacoRadial = Math.min(
-    raioRotulo - 30,
-    RAIO - raioRotulo - 8,
-  ) * 2;
+  const espacoRadial = Math.min(raioRotulo - 30, RAIO - raioRotulo - 8) * 2;
   const espacoTangencial =
-    raioRotulo *
-    2 *
-    Math.sin(Math.PI / Math.max(atividades.length, 1)) *
-    0.8;
+    raioRotulo * 2 * Math.sin(Math.PI / Math.max(atividades.length, 1)) * 0.8;
   const tamanhoFonteRotulo = Math.max(
     1,
     Math.floor(
@@ -179,9 +167,9 @@ export default function RoletaAtividades({
       </Texto>
 
       <View style={styles.roleta}>
-        <View style={styles.seta}>
-          <Texto style={styles.textoSeta}>◀</Texto>
-        </View>
+        <View style={[styles.sombraRoda, { backgroundColor: cores.sombra }]} />
+
+        <View style={[styles.seta, { borderRightColor: cores.borda }]} />
 
         <Animated.View style={[styles.roda, estiloRotacao]}>
           <Svg
@@ -198,17 +186,17 @@ export default function RoletaAtividades({
                 <Fragment key={atividade.id}>
                   <Path
                     d={caminhoFatia(indice, atividades.length)}
-                    fill={CORES_FATIAS[indice % CORES_FATIAS.length]}
-                    stroke="#ffffff"
-                    strokeWidth={2}
+                    fill={fatias[indice % fatias.length]}
+                    stroke={COR_TRACO}
+                    strokeWidth={3}
                   />
                   <SvgText
                     x={rotulo.x}
                     y={rotulo.y}
                     transform={`rotate(${meioFatia}, ${rotulo.x}, ${rotulo.y})`}
-                    fill="#ffffff"
+                    fill={COR_TRACO}
                     fontSize={tamanhoFonteRotulo}
-                    fontWeight="bold"
+                    fontFamily="BricolageGrotesque_800ExtraBold"
                     textAnchor="middle"
                     alignmentBaseline="middle"
                   >
@@ -221,12 +209,28 @@ export default function RoletaAtividades({
             <Circle
               cx={CENTRO}
               cy={CENTRO}
-              r={22}
-              fill="#ffffff"
-              stroke="#263238"
-              strokeWidth={2}
+              r={RAIO + 2}
+              fill="none"
+              stroke={COR_TRACO}
+              strokeWidth={5}
             />
-            <Circle cx={CENTRO} cy={CENTRO} r={7} fill="#263238" />
+            <Circle
+              cx={CENTRO}
+              cy={CENTRO}
+              r={26}
+              fill="#FFFBF4"
+              stroke={COR_TRACO}
+              strokeWidth={4}
+            />
+            <SvgText
+              x={CENTRO}
+              y={CENTRO + 2}
+              fontSize={26}
+              textAnchor="middle"
+              alignmentBaseline="middle"
+            >
+              😴
+            </SvgText>
           </Svg>
         </Animated.View>
       </View>
@@ -270,16 +274,25 @@ const styles = StyleSheet.create({
   seta: {
     position: "absolute",
     zIndex: 1,
-    right: -18,
+    right: -14,
     top: "50%",
-    alignItems: "center",
-    transform: [{ translateY: -18 }],
+    marginTop: -16,
+    width: 0,
+    height: 0,
+    borderTopWidth: 16,
+    borderBottomWidth: 16,
+    borderRightWidth: 30,
+    borderTopColor: "transparent",
+    borderBottomColor: "transparent",
   },
 
-  textoSeta: {
-    fontSize: 26,
-    lineHeight: 36,
-    color: "#d32f2f",
+  sombraRoda: {
+    position: "absolute",
+    width: TAMANHO - 4,
+    height: TAMANHO - 4,
+    borderRadius: (TAMANHO - 4) / 2,
+    left: 12,
+    top: 12,
   },
 
   descricao: {

@@ -1,14 +1,9 @@
-// Testes de API do backend. Rodam sem internet e sem banco:
-// o Postgres e o Overpass são substituídos por simulações.
-//
-//   cd backend && npm test
-
 process.env.OVERPASS_ESPERA_VAZIA_MS = "60";
+process.env.NOMINATIM_INTERVALO_MS = "0";
 
 const { after, before, beforeEach, describe, it } = require("node:test");
 const assert = require("node:assert/strict");
 
-// --- Postgres simulado
 const consultasAoBanco = [];
 
 const poolSimulado = {
@@ -34,7 +29,6 @@ require.cache[caminhoDb] = {
   exports: poolSimulado,
 };
 
-// --- Overpass simulado
 const ELEMENTO = {
   type: "node",
   id: 1,
@@ -65,6 +59,9 @@ const HOSTS = [
   "overpass.openstreetmap.fr",
 ];
 
+const NOMINATIM = "nominatim.openstreetmap.org";
+const GOOGLE = "places.googleapis.com";
+
 function definirOverpass(porHost) {
   comportamentos = porHost;
 }
@@ -86,10 +83,9 @@ global.fetch = async (url, opcoes) => {
     return responder({ elements: [] });
   }
 
-  return comportamento();
+  return comportamento(endereco, opcoes);
 };
 
-// --- Servidor
 const app = require("../server");
 
 let servidor;
@@ -100,7 +96,7 @@ const FILTROS = ['nwr["amenity"="cafe"]', 'nwr["shop"="coffee"]'];
 let proximaLatitude = -22.0;
 
 function corpoValido(extra = {}) {
-  proximaLatitude -= 0.01;
+  proximaLatitude -= 0.01; // cada teste usa uma posição nova para não pegar cache
 
   return {
     latitude: proximaLatitude,
@@ -306,6 +302,227 @@ describe("POST /locais — busca no Overpass", () => {
 
     assert.ok(chamadasOverpass > depoisDaPrimeira, "deveria consultar de novo");
     assert.equal(segunda.corpo.elements.length, 1);
+  });
+});
+
+const RESULTADO_NOMINATIM = (id, nome) => ({
+  osm_type: "node",
+  osm_id: id,
+  lat: "-22.91",
+  lon: "-42.51",
+  name: nome,
+  address: {
+    road: "Rua das Flores",
+    house_number: "10",
+    suburb: "Centro",
+    city: "Saquarema",
+  },
+  extratags: {
+    opening_hours: "Mo-Su 08:00-20:00",
+    website: "https://exemplo.com",
+  },
+});
+
+const LUGAR_GOOGLE = (id, nome) => ({
+  id,
+  displayName: { text: nome },
+  formattedAddress: "Av. Oceânica, 100 - Saquarema",
+  location: { latitude: -22.92, longitude: -42.52 },
+  googleMapsUri: `https://maps.google.com/?cid=${id}`,
+  websiteUri: "https://exemplo.com",
+});
+
+describe("POST /locais — Nominatim (busca do OpenStreetMap usada pelo Leaflet)", () => {
+  it("entra quando o Overpass não encontra nada", async () => {
+    definirOverpass({
+      [NOMINATIM]: async () =>
+        responder([
+          RESULTADO_NOMINATIM(11, "Café do Mar"),
+          RESULTADO_NOMINATIM(12, "Padaria Sol"),
+        ]),
+    });
+
+    const { status, corpo } = await post("/locais", corpoValido());
+
+    assert.equal(status, 200);
+    assert.ok(corpo.fontes.includes("nominatim"));
+    assert.ok(corpo.elements.length >= 2);
+
+    const cafe = corpo.elements.find(
+      (elemento) => elemento.tags.name === "Café do Mar",
+    );
+
+    assert.equal(cafe.tags.fonte, "nominatim");
+    assert.equal(cafe.tags["addr:street"], "Rua das Flores");
+    assert.equal(cafe.tags.opening_hours, "Mo-Su 08:00-20:00");
+  });
+
+  it("limita a busca à área pedida e se identifica", async () => {
+    let enderecoChamado = "";
+    let cabecalhos = {};
+
+    definirOverpass({
+      [NOMINATIM]: async (endereco, opcoes) => {
+        enderecoChamado = endereco;
+        cabecalhos = opcoes.headers;
+
+        return responder([]);
+      },
+    });
+
+    await post("/locais", corpoValido());
+
+    const parametros = new URL(enderecoChamado).searchParams;
+
+    assert.equal(parametros.get("bounded"), "1");
+    assert.match(
+      parametros.get("viewbox"),
+      /^-?\d+\.\d+,-?\d+\.\d+,-?\d+\.\d+,-?\d+\.\d+$/,
+    );
+    assert.match(cabecalhos["User-Agent"], /RoletaDoTedio/);
+  });
+
+  it("não é consultado quando o Overpass já achou o suficiente", async () => {
+    const lugares = Array.from({ length: 6 }, (_, indice) => ({
+      ...ELEMENTO,
+      id: 100 + indice,
+    }));
+
+    let chamadas = 0;
+
+    definirOverpass({
+      "overpass-api.de": async () => responder({ elements: lugares }),
+      [NOMINATIM]: async () => {
+        chamadas += 1;
+
+        return responder([]);
+      },
+    });
+
+    const { corpo } = await post("/locais", corpoValido());
+
+    assert.equal(corpo.elements.length, 6);
+    assert.equal(chamadas, 0);
+  });
+
+  it("ignora resposta de erro do Nominatim sem derrubar a busca", async () => {
+    definirOverpass({
+      "overpass-api.de": async () => responder({ elements: [ELEMENTO] }),
+      [NOMINATIM]: async () => responder({ erro: "limite" }, 429),
+    });
+
+    const { status, corpo } = await post("/locais", corpoValido());
+
+    assert.equal(status, 200);
+    assert.equal(corpo.elements.length, 1);
+  });
+});
+
+describe("POST /locais — Google Maps (Places API)", () => {
+  beforeEach(() => {
+    process.env.GOOGLE_MAPS_API_KEY = "chave-de-teste";
+  });
+
+  after(() => {
+    delete process.env.GOOGLE_MAPS_API_KEY;
+  });
+
+  it("entra quando nem o Overpass nem o Nominatim encontram nada", async () => {
+    let corpoEnviado = null;
+    let cabecalhos = {};
+
+    definirOverpass({
+      [GOOGLE]: async (endereco, opcoes) => {
+        corpoEnviado = JSON.parse(opcoes.body);
+        cabecalhos = opcoes.headers;
+
+        return responder({ places: [LUGAR_GOOGLE("abc", "Cafeteria Praia")] });
+      },
+    });
+
+    const { status, corpo } = await post("/locais", corpoValido());
+
+    assert.equal(status, 200);
+    assert.deepEqual(corpo.fontes, ["google"]);
+
+    const lugar = corpo.elements[0];
+
+    assert.equal(lugar.tags.name, "Cafeteria Praia");
+    assert.equal(lugar.tags.fonte, "google");
+    assert.equal(lugar.tags["google:uri"], "https://maps.google.com/?cid=abc");
+    assert.equal(lugar.tags["addr:street"], "Av. Oceânica, 100 - Saquarema");
+
+    assert.deepEqual(corpoEnviado.includedTypes, ["cafe", "coffee_shop"]);
+    assert.equal(corpoEnviado.locationRestriction.circle.radius, 5000);
+    assert.equal(cabecalhos["X-Goog-Api-Key"], "chave-de-teste");
+    assert.match(cabecalhos["X-Goog-FieldMask"], /places\.googleMapsUri/);
+  });
+
+  it("não gasta a cota do Google quando já há resultado do OpenStreetMap", async () => {
+    let chamadas = 0;
+
+    definirOverpass({
+      "overpass-api.de": async () => responder({ elements: [ELEMENTO] }),
+      [GOOGLE]: async () => {
+        chamadas += 1;
+
+        return responder({ places: [] });
+      },
+    });
+
+    await post("/locais", corpoValido());
+
+    assert.equal(chamadas, 0);
+  });
+
+  it("não usa o Google sem chave configurada", async () => {
+    delete process.env.GOOGLE_MAPS_API_KEY;
+
+    let chamadas = 0;
+
+    definirOverpass({
+      [GOOGLE]: async () => {
+        chamadas += 1;
+
+        return responder({ places: [LUGAR_GOOGLE("x", "Qualquer")] });
+      },
+    });
+
+    const { corpo } = await post("/locais", corpoValido());
+
+    assert.equal(chamadas, 0);
+    assert.deepEqual(corpo.elements, []);
+  });
+
+  it("não guarda resultado do Google no cache (termos de uso)", async () => {
+    let chamadas = 0;
+
+    definirOverpass({
+      [GOOGLE]: async () => {
+        chamadas += 1;
+
+        return responder({ places: [LUGAR_GOOGLE("abc", "Cafeteria Praia")] });
+      },
+    });
+
+    const corpoFixo = corpoValido();
+
+    await post("/locais", corpoFixo);
+    await post("/locais", corpoFixo);
+
+    assert.equal(chamadas, 2);
+  });
+
+  it("falha do Google não derruba a busca", async () => {
+    definirOverpass({
+      [GOOGLE]: async () =>
+        responder({ error: { message: "chave inválida" } }, 403),
+    });
+
+    const { status, corpo } = await post("/locais", corpoValido());
+
+    assert.equal(status, 200);
+    assert.deepEqual(corpo.elements, []);
   });
 });
 

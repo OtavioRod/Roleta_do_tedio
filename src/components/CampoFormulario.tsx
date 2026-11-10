@@ -1,8 +1,13 @@
 import { useState } from "react";
-import { StyleSheet, TextInput, TextInputProps, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  TextInput,
+  TextInputProps,
+  View,
+} from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
-import Botao from "./Botao";
 import Texto from "./Texto";
 
 type Props = {
@@ -33,10 +38,29 @@ export default function CampoFormulario({
   const { cores, escala } = usePreferencias();
 
   const [mostrar, setMostrar] = useState(false);
+  const [focado, setFocado] = useState(false);
 
   return (
     <View style={styles.container}>
-      <Texto style={styles.rotulo}>{rotulo}</Texto>
+      <View style={styles.cabecalho}>
+        <Texto style={styles.rotulo}>{rotulo}</Texto>
+
+        {senha && (
+          <Pressable
+            onPress={() => setMostrar((anterior) => !anterior)}
+            accessibilityRole="button"
+            accessibilityLabel={mostrar ? "Ocultar senha" : "Mostrar senha"}
+            hitSlop={10}
+          >
+            <Texto
+              librasIgnorado
+              style={[styles.mostrar, { color: cores.primariaTexto }]}
+            >
+              {mostrar ? "Ocultar" : "Mostrar senha"}
+            </Texto>
+          </Pressable>
+        )}
+      </View>
 
       <TextInput
         style={[
@@ -46,11 +70,15 @@ export default function CampoFormulario({
             borderColor: erro ? cores.erro : cores.borda,
             backgroundColor: cores.fundo,
             fontSize: 18 * escala,
+            fontFamily: "Figtree_500Medium",
+            boxShadow: focado ? `4px 4px 0px 0px ${cores.sombra}` : "none",
           },
         ]}
         value={valor}
         onChangeText={aoMudar}
         onSubmitEditing={aoEnviar}
+        onFocus={() => setFocado(true)}
+        onBlur={() => setFocado(false)}
         secureTextEntry={senha && !mostrar}
         keyboardType={teclado}
         autoComplete={autoComplete}
@@ -68,16 +96,6 @@ export default function CampoFormulario({
         </Texto>
       ) : null}
 
-      {senha && (
-        <View style={styles.mostrar}>
-          <Botao
-            titulo={mostrar ? "Ocultar senha" : "Mostrar senha"}
-            secundario
-            onPress={() => setMostrar((anterior) => !anterior)}
-          />
-        </View>
-      )}
-
       {erro ? (
         <Texto
           accessibilityRole="alert"
@@ -93,21 +111,33 @@ export default function CampoFormulario({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
-    marginBottom: 16,
+    marginBottom: 18,
+  },
+
+  cabecalho: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
 
   rotulo: {
     fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 6,
+    fontWeight: "700",
+  },
+
+  mostrar: {
+    fontSize: 14,
+    fontWeight: "700",
+    textDecorationLine: "underline",
   },
 
   input: {
     width: "100%",
-    minHeight: 48,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    minHeight: 50,
+    borderWidth: 2,
+    borderRadius: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
   },
 
@@ -117,14 +147,9 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  mostrar: {
-    marginTop: 8,
-    alignSelf: "flex-start",
-  },
-
   erro: {
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: "700",
     marginTop: 6,
   },
 });

@@ -21,37 +21,50 @@ export default function BarraConta() {
     <View
       style={[
         styles.barra,
-        { backgroundColor: cores.superficie, borderBottomColor: cores.borda },
+        { backgroundColor: cores.fundo, borderBottomColor: cores.borda },
       ]}
     >
-      <Texto numberOfLines={1} style={styles.nome}>
-        Olá, {nome}
-      </Texto>
+      <View style={styles.marca}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.dado,
+            { backgroundColor: cores.amarelo, borderColor: cores.borda },
+          ]}
+        >
+          <Texto librasIgnorado style={styles.emoji}>
+            🎲
+          </Texto>
+        </View>
 
-      {liberado && (
-        <>
-          <View style={styles.acao}>
+        <Texto cabecalho numberOfLines={1} style={styles.nome}>
+          Olá, {nome}
+        </Texto>
+      </View>
+
+      <View style={styles.acoes}>
+        {liberado && (
+          <>
             <Botao
               titulo="Salas"
               secundario
+              pequeno
               dica="Cria uma sala online ou entra em uma"
               onPress={() => router.push("/salas")}
             />
-          </View>
 
-          <View style={styles.acao}>
             <Botao
               titulo="Perfil"
               secundario
+              pequeno
               dica="Mostra os dados da sua conta e da sessão"
               onPress={() => router.push("/perfil")}
             />
-          </View>
-        </>
-      )}
+          </>
+        )}
 
-      <View style={styles.acao}>
-        <Botao titulo="Sair" secundario onPress={sair} />
+        <Botao titulo="Sair" pequeno onPress={sair} />
       </View>
     </View>
   );
@@ -62,20 +75,44 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     flexWrap: "wrap",
+    justifyContent: "space-between",
     gap: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+  },
+
+  marca: {
+    flex: 1,
+    minWidth: 140,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  dado: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emoji: {
+    fontSize: 16,
+    lineHeight: 22,
+    color: "#1E130F",
   },
 
   nome: {
-    flex: 1,
-    minWidth: 100,
-    fontSize: 15,
-    fontWeight: "600",
+    flexShrink: 1,
+    fontSize: 18,
   },
 
-  acao: {
-    minWidth: 76,
+  acoes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
 });

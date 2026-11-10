@@ -1,16 +1,22 @@
+import { BricolageGrotesque_800ExtraBold } from "@expo-google-fonts/bricolage-grotesque/800ExtraBold";
+import { Figtree_400Regular } from "@expo-google-fonts/figtree/400Regular";
+import { Figtree_500Medium } from "@expo-google-fonts/figtree/500Medium";
+import { Figtree_700Bold } from "@expo-google-fonts/figtree/700Bold";
+import { useFonts } from "expo-font";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 
-import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AbrirSalaPendente from "@/components/AbrirSalaPendente";
+import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import AvisoConvite from "@/components/AvisoConvite";
 import AvisoNotificacao, {
   NotificadorSocial,
 } from "@/components/AvisoNotificacao";
 import AvisoSessao from "@/components/AvisoSessao";
 import BarraConta from "@/components/BarraConta";
+import OuvinteNotificacoes from "@/components/OuvinteNotificacoes";
 import PainelAcessibilidade from "@/components/PainelAcessibilidade";
 import Texto from "@/components/Texto";
 import VLibrasAppProvider from "@/components/VLibrasAppProvider";
@@ -21,15 +27,23 @@ import {
 } from "@/context/PreferenciasContext";
 import { SessaoProvider, useSessao } from "@/context/SessaoContext";
 import { acordarBackend } from "@/services/acordarBackend";
-import OuvinteNotificacoes from "@/components/OuvinteNotificacoes";
 import { definirSistemaPermitido } from "@/services/notificar";
-import { carregarPreferenciasAudio } from "@/services/preferenciasAudio";
 import { configurarNotificacoes } from "@/services/permissoes";
+import { carregarPreferenciasAudio } from "@/services/preferenciasAudio";
 
 SplashScreen.preventAutoHideAsync();
 
 function Conteudo() {
   const { tema, cores } = usePreferencias();
+
+  const [fontesCarregadas, erroFontes] = useFonts({
+    BricolageGrotesque_800ExtraBold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_700Bold,
+  });
+
+  const fontesProntas = fontesCarregadas || erroFontes !== null;
 
   const { carregando, usuario, perfil, emailOk, permissoesConcluidas } =
     useSessao();
@@ -55,8 +69,19 @@ function Conteudo() {
       <VLibrasAppProvider>
         <AnimatedSplashOverlay />
 
-        <View style={[styles.raiz, { backgroundColor: cores.fundo }]}>
-          {carregando ? (
+        <View
+          style={[
+            styles.raiz,
+            { backgroundColor: cores.fundo },
+            Platform.OS === "web"
+              ? ({
+                  backgroundImage: `radial-gradient(${cores.ponto} 1px, transparent 1px)`,
+                  backgroundSize: "22px 22px",
+                } as object)
+              : null,
+          ]}
+        >
+          {carregando || !fontesProntas ? (
             <View
               style={styles.carregando}
               accessibilityRole="progressbar"
@@ -74,7 +99,10 @@ function Conteudo() {
                 <Stack
                   screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: cores.fundo },
+                    contentStyle: {
+                      backgroundColor:
+                        Platform.OS === "web" ? "transparent" : cores.fundo,
+                    },
                   }}
                 >
                   <Stack.Protected guard={liberado && permissoesConcluidas}>

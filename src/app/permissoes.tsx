@@ -1,25 +1,26 @@
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-    AppState,
-    Linking,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    View,
+  AppState,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  View,
 } from "react-native";
 
 import Botao from "../components/Botao";
 import CaixaMarcacao from "../components/CaixaMarcacao";
+import { estiloPainel } from "../components/Painel";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
 import {
-    EstadoPermissao,
-    estadoLocalizacao,
-    estadoNotificacoes,
-    pedirLocalizacao,
-    pedirNotificacoes,
+  EstadoPermissao,
+  estadoLocalizacao,
+  estadoNotificacoes,
+  pedirLocalizacao,
+  pedirNotificacoes,
 } from "../services/permissoes";
 
 const TEXTO_ESTADO: Record<EstadoPermissao, string> = {
@@ -31,6 +32,8 @@ const TEXTO_ESTADO: Record<EstadoPermissao, string> = {
 
 type CartaoProps = {
   titulo: string;
+  icone: string;
+  corIcone: "amarelo" | "verde";
   explicacao: string;
   estado: EstadoPermissao;
   ocupado: boolean;
@@ -39,6 +42,8 @@ type CartaoProps = {
 
 function Cartao({
   titulo,
+  icone,
+  corIcone,
   explicacao,
   estado,
   ocupado,
@@ -55,21 +60,38 @@ function Cartao({
   }
 
   return (
-    <View
-      style={[
-        styles.cartao,
-        { borderColor: cores.borda, backgroundColor: cores.superficie },
-      ]}
-    >
-      <Texto cabecalho style={styles.cartaoTitulo}>
-        {titulo}
+    <View style={[styles.cartao, estiloPainel(cores)]}>
+      <View style={styles.cabecalho}>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.icone,
+            { backgroundColor: cores[corIcone], borderColor: cores.borda },
+          ]}
+        >
+          <Texto librasIgnorado style={styles.emoji}>
+            {icone}
+          </Texto>
+        </View>
+
+        <Texto cabecalho style={styles.cartaoTitulo}>
+          {titulo}
+        </Texto>
+      </View>
+
+      <Texto style={[styles.explicacao, { color: cores.textoSecundario }]}>
+        {explicacao}
       </Texto>
 
-      <Texto style={styles.explicacao}>{explicacao}</Texto>
-
-      <Texto style={[styles.estado, { color: cores.textoSecundario }]}>
-        Situação: {TEXTO_ESTADO[estado]}
-      </Texto>
+      <View
+        style={[
+          styles.selo,
+          { backgroundColor: cores.fundo, borderColor: cores.borda },
+        ]}
+      >
+        <Texto style={styles.textoSelo}>Situação: {TEXTO_ESTADO[estado]}</Texto>
+      </View>
 
       {estado === "nao-perguntada" && (
         <Botao
@@ -203,6 +225,8 @@ export default function Permissoes() {
 
         <Cartao
           titulo="Localização"
+          icone="📍"
+          corIcone="verde"
           explicacao="Usamos a sua localização para achar restaurantes, cafés, cinemas e eventos perto de você, e para ver o clima. Ela não é salva no seu perfil."
           estado={localizacao}
           ocupado={ocupado}
@@ -211,6 +235,8 @@ export default function Permissoes() {
 
         <Cartao
           titulo="Notificações"
+          icone="🔔"
+          corIcone="amarelo"
           explicacao="Para avisar você sobre novidades do app no aparelho. Se preferir, deixe para depois."
           estado={notificacoes}
           ocupado={ocupado}
@@ -231,15 +257,25 @@ export default function Permissoes() {
           </Texto>
         )}
 
-        <View
-          style={[
-            styles.cartao,
-            { borderColor: cores.borda, backgroundColor: cores.superficie },
-          ]}
-        >
-          <Texto cabecalho style={styles.cartaoTitulo}>
-            Avisos por e-mail
-          </Texto>
+        <View style={[styles.cartao, estiloPainel(cores)]}>
+          <View style={styles.cabecalho}>
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+              style={[
+                styles.icone,
+                { backgroundColor: cores.rosa, borderColor: cores.borda },
+              ]}
+            >
+              <Texto librasIgnorado style={styles.emoji}>
+                ✉️
+              </Texto>
+            </View>
+
+            <Texto cabecalho style={styles.cartaoTitulo}>
+              Avisos por e-mail
+            </Texto>
+          </View>
 
           <CaixaMarcacao
             rotulo={`Receber avisos em ${perfil?.email ?? "meu e-mail"}`}
@@ -286,28 +322,63 @@ const styles = StyleSheet.create({
   },
 
   titulo: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 40,
+    lineHeight: 44,
     marginBottom: 8,
   },
 
   intro: {
-    fontSize: 16,
-    lineHeight: 23,
-    marginBottom: 16,
+    fontSize: 17,
+    lineHeight: 24,
+    marginBottom: 22,
   },
 
   cartao: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
+    padding: 20,
+    marginBottom: 20,
+    marginRight: 8,
+  },
+
+  cabecalho: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 10,
+  },
+
+  icone: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  emoji: {
+    fontSize: 22,
+    lineHeight: 30,
+    color: "#1E130F",
+  },
+
+  selo: {
+    alignSelf: "flex-start",
+    borderWidth: 2,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
     marginBottom: 14,
   },
 
+  textoSelo: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
   cartaoTitulo: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
+    flex: 1,
+    fontSize: 24,
+    marginBottom: 0,
   },
 
   explicacao: {

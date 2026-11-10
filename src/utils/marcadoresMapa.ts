@@ -50,23 +50,25 @@ export function montarMarcadores(
     dados: "",
   };
 
-  const itens = locais.map<MarcadorMapa>((local) => {
-    const status = avaliarHorario(local.horario, agora);
+  const itens = locais
+    .filter((local) => local.fonte !== "google")
+    .map<MarcadorMapa>((local) => {
+      const status = avaliarHorario(local.horario, agora);
 
-    return {
-      id: local.id,
-      nome: local.nome,
-      latitude: local.latitude,
-      longitude: local.longitude,
-      endereco: local.endereco,
-      estado: status.estado,
-      status: status.texto,
-      distancia: formatarDistancia(local.distanciaMetros),
-      rota: urlRotaGoogle(local.latitude, local.longitude),
-      conferir: urlBuscaNoMapa(local.latitude, local.longitude, local.nome),
-      dados: local.osmUrl ?? "",
-    };
-  });
+      return {
+        id: local.id,
+        nome: local.nome,
+        latitude: local.latitude,
+        longitude: local.longitude,
+        endereco: local.endereco,
+        estado: status.estado,
+        status: status.texto,
+        distancia: formatarDistancia(local.distanciaMetros),
+        rota: urlRotaGoogle(local.latitude, local.longitude),
+        conferir: urlBuscaNoMapa(local.latitude, local.longitude, local.nome),
+        dados: local.osmUrl ?? "",
+      };
+    });
 
   return [usuario, ...itens];
 }

@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const pool = require("./db");
+const { buscarGoogle, buscarNominatim } = require("./provedores");
 
 const app = express();
 
@@ -229,19 +230,64 @@ app.post("/locais", async (req, res) => {
 
     const inicio = Date.now();
 
-    const dados = await consultarOverpass(consulta);
+    let dados = { elements: [] };
+    let erroOverpass = null;
+
+    try {
+      dados = await consultarOverpass(consulta);
+    } catch (erro) {
+      erroOverpass = erro;
+    }
 
     const tempo = ((Date.now() - inicio) / 1000).toFixed(2);
 
     console.log(`Busca Overpass concluída em ${tempo}s`);
 
-    console.log("Elementos encontrados:", dados.elements.length);
+    console.log("Elementos encontrados no Overpass:", dados.elements.length);
 
-    if (dados.elements.length > 0) {
-      cacheLocais.set(chave, { quando: Date.now(), dados });
+    const minimo = tipo === "cinema" ? 1 : 5;
+    const minimoGoogle = Number(process.env.GOOGLE_QUANDO_MENOS_DE) || 1;
+
+    let elementos = [...dados.elements];
+
+    const fontes = elementos.length > 0 ? ["overpass"] : [];
+
+    if (elementos.length < minimo) {
+      const extras = await buscarNominatim({ latitude, longitude, raio, tipo });
+
+      if (extras.length > 0) {
+        elementos = elementos.concat(extras);
+        fontes.push("nominatim");
+      }
+
+      console.log("Elementos encontrados no Nominatim:", extras.length);
     }
 
-    res.json(dados);
+    let usouGoogle = false;
+
+    if (elementos.length < minimoGoogle) {
+      const extras = await buscarGoogle({ latitude, longitude, raio, tipo });
+
+      if (extras.length > 0) {
+        elementos = elementos.concat(extras);
+        fontes.push("google");
+        usouGoogle = true;
+      }
+
+      console.log("Elementos encontrados no Google:", extras.length);
+    }
+
+    if (elementos.length === 0 && erroOverpass) {
+      throw erroOverpass;
+    }
+
+    const resposta = { ...dados, elements: elementos, fontes };
+
+    if (elementos.length > 0 && !usouGoogle) {
+      cacheLocais.set(chave, { quando: Date.now(), dados: resposta });
+    }
+
+    res.json(resposta);
   } catch (error) {
     console.error("Erro na rota /locais:", error);
 
@@ -284,7 +330,9 @@ app.get("/teste-overpass", async (req, res) => {
         return {
           endereco,
           situacao: "falhou",
-          motivo: erro.cause ? erro.cause.code || erro.cause.message : erro.message,
+          motivo: erro.cause
+            ? erro.cause.code || erro.cause.message
+            : erro.message,
           tempoMs: Date.now() - inicio,
         };
       }

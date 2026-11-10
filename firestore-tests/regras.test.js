@@ -27,7 +27,10 @@ before(async () => {
   ambiente = await initializeTestEnvironment({
     projectId: "demo-roleta",
     firestore: {
-      rules: fs.readFileSync(path.join(__dirname, "..", "firestore.rules"), "utf8"),
+      rules: fs.readFileSync(
+        path.join(__dirname, "..", "firestore.rules"),
+        "utf8",
+      ),
       host: "127.0.0.1",
       port: 8080,
     },
@@ -113,7 +116,10 @@ test("amizade: só o outro lado aceita o pedido", async () => {
 
 test("convite: exige amizade aceita e sala em que a pessoa é membro", async () => {
   await semRegras(async (admin) => {
-    await setDoc(doc(admin, "salas/ABC123"), salaBase({ membrosUids: ["alice"] }));
+    await setDoc(
+      doc(admin, "salas/ABC123"),
+      salaBase({ membrosUids: ["alice"] }),
+    );
     await setDoc(doc(admin, "amizades/alice_bob"), {
       membros: ["alice", "bob"],
       nomes: { alice: "Alice", bob: "Bob" },
@@ -137,7 +143,10 @@ test("convite: exige amizade aceita e sala em que a pessoa é membro", async () 
   );
 
   await assertFails(
-    setDoc(doc(bd("alice"), "convites/ABC123_carol"), convite("alice", "carol")),
+    setDoc(
+      doc(bd("alice"), "convites/ABC123_carol"),
+      convite("alice", "carol"),
+    ),
   );
 
   await assertFails(
@@ -158,16 +167,23 @@ test("sala: entrar respeita o limite e a lista só mostra as minhas salas", asyn
   });
 
   await assertFails(
-    updateDoc(doc(bd("carol"), "salas/CASAL1"), { membrosUids: arrayUnion("carol") }),
+    updateDoc(doc(bd("carol"), "salas/CASAL1"), {
+      membrosUids: arrayUnion("carol"),
+    }),
   );
 
   await assertSucceeds(
-    updateDoc(doc(bd("bob"), "salas/GRUPO1"), { membrosUids: arrayUnion("bob") }),
+    updateDoc(doc(bd("bob"), "salas/GRUPO1"), {
+      membrosUids: arrayUnion("bob"),
+    }),
   );
 
   await assertSucceeds(
     getDocs(
-      query(collection(bd("alice"), "salas"), where("membrosUids", "array-contains", "alice")),
+      query(
+        collection(bd("alice"), "salas"),
+        where("membrosUids", "array-contains", "alice"),
+      ),
     ),
   );
 
@@ -176,7 +192,10 @@ test("sala: entrar respeita o limite e a lista só mostra as minhas salas", asyn
 
 test("resultado: um membro grava uma vez; quem não é membro não grava", async () => {
   await semRegras(async (admin) => {
-    await setDoc(doc(admin, "salas/ABC123"), salaBase({ estado: "respondendo" }));
+    await setDoc(
+      doc(admin, "salas/ABC123"),
+      salaBase({ estado: "respondendo" }),
+    );
   });
 
   const gravar = (uid) =>
@@ -193,7 +212,10 @@ test("resultado: um membro grava uma vez; quem não é membro não grava", async
 
 test("progresso: de 0 a 4 e só na rodada atual", async () => {
   await semRegras(async (admin) => {
-    await setDoc(doc(admin, "salas/ABC123"), salaBase({ estado: "respondendo" }));
+    await setDoc(
+      doc(admin, "salas/ABC123"),
+      salaBase({ estado: "respondendo" }),
+    );
     await setDoc(doc(admin, "salas/ABC123/membros/bob"), {
       nome: "Bob",
       respostas: null,
@@ -223,39 +245,64 @@ test("votação: o voto precisa ser da tentativa atual", async () => {
 
   const membro = doc(bd("bob"), "salas/ABC123/membros/bob");
 
-  await assertSucceeds(updateDoc(membro, { voto: { tentativa: 1, valor: "topo" } }));
-  await assertFails(updateDoc(membro, { voto: { tentativa: 2, valor: "topo" } }));
-  await assertFails(updateDoc(membro, { voto: { tentativa: 1, valor: "talvez" } }));
+  await assertSucceeds(
+    updateDoc(membro, { voto: { tentativa: 1, valor: "topo" } }),
+  );
+  await assertFails(
+    updateDoc(membro, { voto: { tentativa: 2, valor: "topo" } }),
+  );
+  await assertFails(
+    updateDoc(membro, { voto: { tentativa: 1, valor: "talvez" } }),
+  );
 });
 
 test("giro de novo e confirmação seguem a sequência", async () => {
   await semRegras(async (admin) => {
     await setDoc(
       doc(admin, "salas/ABC123"),
-      salaBase({ estado: "resultado", tentativa: 1, vetadas: [], resultado: resultado(1) }),
+      salaBase({
+        estado: "resultado",
+        tentativa: 1,
+        vetadas: [],
+        resultado: resultado(1),
+      }),
     );
   });
 
   const sala = doc(bd("bob"), "salas/ABC123");
 
   await assertFails(
-    updateDoc(sala, { tentativa: 5, vetadas: ["cafe"], resultado: resultado(5) }),
+    updateDoc(sala, {
+      tentativa: 5,
+      vetadas: ["cafe"],
+      resultado: resultado(5),
+    }),
   );
 
   await assertSucceeds(
-    updateDoc(sala, { tentativa: 2, vetadas: ["cafe"], resultado: resultado(2) }),
+    updateDoc(sala, {
+      tentativa: 2,
+      vetadas: ["cafe"],
+      resultado: resultado(2),
+    }),
   );
 
   await assertSucceeds(
     updateDoc(sala, {
       confirmada: true,
       ultimaAtividadeId: "cafe",
-      historico: [{ rodada: 1, atividadeId: "cafe", atividadeNome: "Tomar um café" }],
+      historico: [
+        { rodada: 1, atividadeId: "cafe", atividadeNome: "Tomar um café" },
+      ],
     }),
   );
 
   await assertFails(
-    updateDoc(sala, { tentativa: 3, vetadas: ["cafe", "cinema"], resultado: resultado(3) }),
+    updateDoc(sala, {
+      tentativa: 3,
+      vetadas: ["cafe", "cinema"],
+      resultado: resultado(3),
+    }),
   );
 });
 
@@ -268,15 +315,22 @@ test("dono: passa o comando ao sair e remove participantes; outros não podem", 
   });
 
   await assertFails(
-    updateDoc(doc(bd("bob"), "salas/ABC123"), { donoUid: "bob", donoNome: "Bob" }),
+    updateDoc(doc(bd("bob"), "salas/ABC123"), {
+      donoUid: "bob",
+      donoNome: "Bob",
+    }),
   );
 
   await assertFails(
-    updateDoc(doc(bd("bob"), "salas/ABC123"), { membrosUids: arrayRemove("carol") }),
+    updateDoc(doc(bd("bob"), "salas/ABC123"), {
+      membrosUids: arrayRemove("carol"),
+    }),
   );
 
   await assertSucceeds(
-    updateDoc(doc(bd("alice"), "salas/ABC123"), { membrosUids: arrayRemove("carol") }),
+    updateDoc(doc(bd("alice"), "salas/ABC123"), {
+      membrosUids: arrayRemove("carol"),
+    }),
   );
 
   await assertSucceeds(
@@ -299,13 +353,19 @@ test("presença: só vale o horário do servidor, e só o próprio registro", as
   });
 
   await assertSucceeds(
-    updateDoc(doc(bd("bob"), "salas/ABC123/membros/bob"), { visto: serverTimestamp() }),
+    updateDoc(doc(bd("bob"), "salas/ABC123/membros/bob"), {
+      visto: serverTimestamp(),
+    }),
   );
 
-  await assertFails(updateDoc(doc(bd("bob"), "salas/ABC123/membros/bob"), { visto: 123 }));
+  await assertFails(
+    updateDoc(doc(bd("bob"), "salas/ABC123/membros/bob"), { visto: 123 }),
+  );
 
   await assertFails(
-    updateDoc(doc(bd("alice"), "salas/ABC123/membros/bob"), { visto: serverTimestamp() }),
+    updateDoc(doc(bd("alice"), "salas/ABC123/membros/bob"), {
+      visto: serverTimestamp(),
+    }),
   );
 });
 
@@ -316,9 +376,16 @@ test("push: cada pessoa registra só os próprios aparelhos", async () => {
     atualizadoEm: serverTimestamp(),
   };
 
-  await assertSucceeds(setDoc(doc(bd("alice"), "users/alice/dispositivos/a1"), aparelho));
-  await assertFails(setDoc(doc(bd("bob"), "users/alice/dispositivos/a2"), aparelho));
+  await assertSucceeds(
+    setDoc(doc(bd("alice"), "users/alice/dispositivos/a1"), aparelho),
+  );
   await assertFails(
-    setDoc(doc(bd("alice"), "users/alice/dispositivos/a3"), { ...aparelho, plataforma: "web" }),
+    setDoc(doc(bd("bob"), "users/alice/dispositivos/a2"), aparelho),
+  );
+  await assertFails(
+    setDoc(doc(bd("alice"), "users/alice/dispositivos/a3"), {
+      ...aparelho,
+      plataforma: "web",
+    }),
   );
 });

@@ -4,11 +4,13 @@ import { ScrollView, StyleSheet, View } from "react-native";
 
 import Botao from "../components/Botao";
 import CampoFormulario from "../components/CampoFormulario";
+import MarcaApp from "../components/MarcaApp";
+import Painel from "../components/Painel";
 import Texto from "../components/Texto";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { useSessao } from "../context/SessaoContext";
-import { firebaseConfigurado } from "../services/firebase";
 import { ErroEntradaNativa } from "../services/entradaNativa";
+import { firebaseConfigurado } from "../services/firebase";
 import { codigoErroAuth, mensagemErroAuth } from "../utils/mensagensAuth";
 import { validarEmail, validarLogin } from "../utils/validacoes";
 
@@ -128,116 +130,117 @@ export default function Entrar() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.coluna}>
-        <Texto cabecalho style={styles.titulo}>
-          Roleta do Tédio
-        </Texto>
+        <Painel>
+          <MarcaApp
+            titulo="Roleta do Tédio"
+            destacar="Tédio"
+            subtitulo="Entre na sua conta"
+          />
 
-        <Texto style={styles.subtitulo}>Entre na sua conta</Texto>
+          {motivoEncerramento === "inatividade" && (
+            <Texto accessibilityRole="alert" style={styles.aviso}>
+              Sua sessão expirou por inatividade. Entre novamente para
+              continuar.
+            </Texto>
+          )}
 
-        {motivoEncerramento === "inatividade" && (
-          <Texto accessibilityRole="alert" style={styles.aviso}>
-            Sua sessão expirou por inatividade. Entre novamente para continuar.
-          </Texto>
-        )}
+          {motivoEncerramento === "segundo-plano" && (
+            <Texto accessibilityRole="alert" style={styles.aviso}>
+              O aplicativo ficou em segundo plano por tempo demais. Entre com
+              sua senha ou use a biometria para desbloquear sua sessão Firebase.
+            </Texto>
+          )}
 
-        {motivoEncerramento === "segundo-plano" && (
-          <Texto accessibilityRole="alert" style={styles.aviso}>
-            O aplicativo ficou em segundo plano por tempo demais. Entre com
-            sua senha ou use a biometria para desbloquear sua sessão Firebase.
-          </Texto>
-        )}
+          {!firebaseConfigurado() && (
+            <Texto accessibilityRole="alert" style={styles.aviso}>
+              O Firebase ainda não foi configurado. Confira o arquivo .env.
+            </Texto>
+          )}
 
-        {!firebaseConfigurado() && (
-          <Texto accessibilityRole="alert" style={styles.aviso}>
-            O Firebase ainda não foi configurado. Confira o arquivo .env.
-          </Texto>
-        )}
+          <CampoFormulario
+            rotulo="E-mail"
+            valor={email}
+            aoMudar={(texto) => {
+              setEmail(texto);
+              setErros((anteriores) => ({ ...anteriores, email: undefined }));
+            }}
+            teclado="email-address"
+            autoComplete="email"
+            erro={erros.email}
+          />
 
-        <CampoFormulario
-          rotulo="E-mail"
-          valor={email}
-          aoMudar={(texto) => {
-            setEmail(texto);
-            setErros((anteriores) => ({ ...anteriores, email: undefined }));
-          }}
-          teclado="email-address"
-          autoComplete="email"
-          erro={erros.email}
-        />
+          <CampoFormulario
+            rotulo="Senha"
+            valor={senha}
+            aoMudar={(texto) => {
+              setSenha(texto);
+              setErros((anteriores) => ({ ...anteriores, senha: undefined }));
+            }}
+            aoEnviar={enviar}
+            senha
+            autoComplete="current-password"
+            erro={erros.senha}
+          />
 
-        <CampoFormulario
-          rotulo="Senha"
-          valor={senha}
-          aoMudar={(texto) => {
-            setSenha(texto);
-            setErros((anteriores) => ({ ...anteriores, senha: undefined }));
-          }}
-          aoEnviar={enviar}
-          senha
-          autoComplete="current-password"
-          erro={erros.senha}
-        />
+          {contaBloqueada && entradaNativaDisponivel && (
+            <>
+              <Botao
+                titulo={enviando ? "Confirmando..." : "Entrar com biometria"}
+                onPress={desbloquearComBiometria}
+                desabilitado={enviando}
+                dica="Desbloqueia a sessão Firebase salva neste aparelho após confirmação biométrica."
+              />
 
-        {contaBloqueada && entradaNativaDisponivel && (
-          <>
-            <Botao
-              titulo={
-                enviando ? "Confirmando..." : "Entrar com biometria"
-              }
-              onPress={desbloquearComBiometria}
-              desabilitado={enviando}
-              dica="Desbloqueia a sessão Firebase salva neste aparelho após confirmação biométrica."
-            />
+              <View style={styles.espaco} />
+            </>
+          )}
 
-            <View style={styles.espaco} />
-          </>
-        )}
+          {erroGeral !== "" && (
+            <Texto
+              accessibilityRole="alert"
+              style={[styles.erroGeral, { color: cores.erro }]}
+            >
+              {erroGeral}
+            </Texto>
+          )}
 
-        {erroGeral !== "" && (
-          <Texto
-            accessibilityRole="alert"
-            style={[styles.erroGeral, { color: cores.erro }]}
-          >
-            {erroGeral}
-          </Texto>
-        )}
+          {informacao !== "" && (
+            <Texto accessibilityRole="alert" style={styles.informacao}>
+              {informacao}
+            </Texto>
+          )}
 
-        {informacao !== "" && (
-          <Texto accessibilityRole="alert" style={styles.informacao}>
-            {informacao}
-          </Texto>
-        )}
+          <Botao
+            titulo={enviando ? "Entrando..." : "Entrar"}
+            onPress={enviar}
+            desabilitado={enviando}
+          />
 
-        <Botao
-          titulo={enviando ? "Entrando..." : "Entrar"}
-          onPress={enviar}
-          desabilitado={enviando}
-        />
+          <View style={styles.espaco} />
 
-        <View style={styles.espaco} />
+          <Botao titulo="Esqueci minha senha" secundario onPress={recuperar} />
 
-        <Botao titulo="Esqueci minha senha" secundario onPress={recuperar} />
+          <View style={styles.espaco} />
 
-        <View style={styles.espaco} />
+          <Botao
+            titulo="Criar uma conta"
+            secundario
+            onPress={() => router.push("/cadastrar")}
+          />
 
-        <Botao
-          titulo="Criar uma conta"
-          secundario
-          onPress={() => router.push("/cadastrar")}
-        />
+          {contaBloqueada && (
+            <>
+              <View style={styles.espaco} />
 
-        {contaBloqueada && (
-          <>
-            <View style={styles.espaco} />
-
-            <Botao
-              titulo="Encerrar sessão salva"
-              secundario
-              onPress={sair}
-              dica="Remove do aparelho a sessão Firebase que está bloqueada."
-            />
-          </>
-        )}
+              <Botao
+                titulo="Encerrar sessão salva"
+                secundario
+                onPress={sair}
+                dica="Remove do aparelho a sessão Firebase que está bloqueada."
+              />
+            </>
+          )}
+        </Painel>
       </View>
     </ScrollView>
   );

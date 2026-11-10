@@ -5,7 +5,9 @@ import { entrar, temConta } from "./ajudantes";
 test.describe("Fluxo no mesmo aparelho", () => {
   test.skip(!temConta(1), "Defina E2E_EMAIL e E2E_SENHA");
 
-  test("a pessoa entra, começa e chega à primeira pergunta", async ({ page }) => {
+  test("a pessoa entra, começa e chega à primeira pergunta", async ({
+    page,
+  }) => {
     await entrar(page);
 
     await page.getByRole("button", { name: "Começar", exact: true }).click();

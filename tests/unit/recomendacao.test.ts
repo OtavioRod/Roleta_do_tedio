@@ -78,11 +78,11 @@ describe("escolherAtividadeDoGrupo", () => {
       tempo: "30 minutos",
     };
 
-    const { semFiltro } = escolherAtividadeDoGrupo(
-      [apertado],
-      () => 0,
-      ["cafe", "jogar", "filme-casa"],
-    );
+    const { semFiltro } = escolherAtividadeDoGrupo([apertado], () => 0, [
+      "cafe",
+      "jogar",
+      "filme-casa",
+    ]);
 
     assert.equal(semFiltro, true);
   });
@@ -145,7 +145,9 @@ describe("sorteio determinístico (resultado igual para todos da sala)", () => {
 
   it("[regressão] sala, rodada e tentativa iguais dão a mesma atividade em qualquer aparelho", () => {
     const primeiro = sortearParaSala("ZXCV12", 3, 2, [ana, bruno], ["cafe"]);
-    const segundo = sortearParaSala("ZXCV12", 3, 2, [bruno, ana].reverse(), ["cafe"]);
+    const segundo = sortearParaSala("ZXCV12", 3, 2, [bruno, ana].reverse(), [
+      "cafe",
+    ]);
 
     assert.equal(primeiro.atividade.id, segundo.atividade.id);
     assert.equal(primeiro.semFiltro, segundo.semFiltro);
@@ -153,7 +155,11 @@ describe("sorteio determinístico (resultado igual para todos da sala)", () => {
 });
 
 describe("participantesDaRodada", () => {
-  const membro = (uid: string, rodada: number, tempo = "1 hora"): MembroParaDecisao => ({
+  const membro = (
+    uid: string,
+    rodada: number,
+    tempo = "1 hora",
+  ): MembroParaDecisao => ({
     uid,
     rodada,
     nome: uid,
@@ -169,11 +175,7 @@ describe("participantesDaRodada", () => {
 
   it("ignora respostas de outras rodadas e quem ainda não respondeu", () => {
     const lista = participantesDaRodada(
-      [
-        membro("b", 2),
-        membro("a", 1),
-        { ...membro("c", 2), respostas: null },
-      ],
+      [membro("b", 2), membro("a", 1), { ...membro("c", 2), respostas: null }],
       2,
     );
 
@@ -211,19 +213,31 @@ describe("apurarVotacao", () => {
   });
 
   it("espera todo mundo votar", () => {
-    assert.equal(apurarVotacao([voto("a", "topo"), voto("b", null)], 1), "aguardando");
+    assert.equal(
+      apurarVotacao([voto("a", "topo"), voto("b", null)], 1),
+      "aguardando",
+    );
   });
 
   it("confirma só com mais da metade", () => {
     assert.equal(
-      apurarVotacao([voto("a", "topo"), voto("b", "topo"), voto("c", "nao")], 1),
+      apurarVotacao(
+        [voto("a", "topo"), voto("b", "topo"), voto("c", "nao")],
+        1,
+      ),
       "confirmar",
     );
   });
 
   it("empate gira de novo (num casal, os dois precisam topar)", () => {
-    assert.equal(apurarVotacao([voto("a", "topo"), voto("b", "nao")], 1), "girar-de-novo");
-    assert.equal(apurarVotacao([voto("a", "topo"), voto("b", "topo")], 1), "confirmar");
+    assert.equal(
+      apurarVotacao([voto("a", "topo"), voto("b", "nao")], 1),
+      "girar-de-novo",
+    );
+    assert.equal(
+      apurarVotacao([voto("a", "topo"), voto("b", "topo")], 1),
+      "confirmar",
+    );
   });
 
   it("voto de uma tentativa antiga não vale na atual", () => {
@@ -236,14 +250,21 @@ describe("apurarVotacao", () => {
 
 describe("explicarResultado", () => {
   it("diz quem limita o tempo e o orçamento", () => {
-    const linhas = explicarResultado([ana, bruno], porId("cafe"), false).join(" ");
+    const linhas = explicarResultado([ana, bruno], porId("cafe"), false).join(
+      " ",
+    );
 
     assert.match(linhas, /30 min \(Ana\)/);
     assert.match(linhas, /Ana/);
   });
 
   it("modo discreto não revela nomes", () => {
-    const linhas = explicarResultado([ana, bruno], porId("cafe"), false, true).join(" ");
+    const linhas = explicarResultado(
+      [ana, bruno],
+      porId("cafe"),
+      false,
+      true,
+    ).join(" ");
 
     assert.ok(!linhas.includes("Ana"));
     assert.ok(!linhas.includes("Bruno"));

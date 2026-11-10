@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { Atividade } from "../data/atividades";
 import { explicarResultado, ParticipanteGrupo } from "../utils/recomendacao";
+import { estiloPainel } from "./Painel";
 import Texto from "./Texto";
 
 type Props = {
@@ -32,7 +33,7 @@ export default function ExplicacaoResultado({
   }
 
   return (
-    <View style={[styles.caixa, { borderColor: cores.borda }]}>
+    <View style={[styles.caixa, estiloPainel(cores, true)]}>
       <Texto cabecalho style={styles.titulo}>
         Por que a roleta escolheu isso?
       </Texto>
@@ -49,10 +50,9 @@ export default function ExplicacaoResultado({
 const styles = StyleSheet.create({
   caixa: {
     width: "100%",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
+    padding: 16,
     marginBottom: 20,
+    marginRight: 6,
   },
 
   titulo: {

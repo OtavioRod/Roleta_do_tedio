@@ -1,15 +1,15 @@
 import {
-    collection,
-    deleteDoc,
-    doc,
-    getDoc,
-    onSnapshot,
-    query,
-    serverTimestamp,
-    setDoc,
-    Unsubscribe,
-    updateDoc,
-    where,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  onSnapshot,
+  query,
+  serverTimestamp,
+  setDoc,
+  Unsubscribe,
+  updateDoc,
+  where,
 } from "firebase/firestore";
 
 import { obterFirestore } from "./firebase";
@@ -39,15 +39,11 @@ export async function enviarConvite(
     if (existente.exists() && existente.data().estado === "pendente") {
       return "ja-enviado";
     }
-  } catch {
-    // sem permissão para ler um convite que não existe: segue e cria
-  }
+  } catch {}
 
   try {
     await deleteDoc(referencia);
-  } catch {
-    // não existia ou já foi respondido: o setDoc abaixo recria o convite
-  }
+  } catch {}
 
   await setDoc(referencia, {
     de: de.uid,
