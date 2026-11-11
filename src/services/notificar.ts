@@ -36,9 +36,7 @@ export function definirPushAtivo(ativo: boolean) {
 export function anunciar(texto: string) {
   try {
     AccessibilityInfo.announceForAccessibility?.(texto);
-  } catch {
-    // leitor de tela indisponível
-  }
+  } catch {}
 }
 
 export function aplicativoEmSegundoPlano() {
@@ -75,7 +73,6 @@ export function notificar({
   }
 
   if (segundoPlano) {
-    // com push ativo no celular, o servidor já envia a notificação
     if (sistemaPermitido && !(pushAtivo && Platform.OS !== "web")) {
       exibirNotificacaoLocal(titulo, texto ?? "").catch(() => undefined);
     }

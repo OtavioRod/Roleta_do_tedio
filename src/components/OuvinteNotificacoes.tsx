@@ -20,7 +20,8 @@ export default function OuvinteNotificacoes() {
   const { carregando, usuario, perfil, emailOk, permissoesConcluidas } =
     useSessao();
 
-  const ativo = !carregando && Boolean(usuario) && emailOk && permissoesConcluidas;
+  const ativo =
+    !carregando && Boolean(usuario) && emailOk && permissoesConcluidas;
 
   const uid = usuario?.uid ?? "";
 
@@ -77,9 +78,7 @@ export default function OuvinteNotificacoes() {
 
         assinatura = modulo.addNotificationResponseReceivedListener(
           (resposta) => {
-            abrir(
-              resposta.notification.request.content.data as Dados,
-            );
+            abrir(resposta.notification.request.content.data as Dados);
           },
         );
 

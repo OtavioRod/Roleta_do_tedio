@@ -14,7 +14,8 @@ export default function AbrirSalaPendente() {
 
   const { carregando, usuario, emailOk, permissoesConcluidas } = useSessao();
 
-  const liberado = !carregando && Boolean(usuario) && emailOk && permissoesConcluidas;
+  const liberado =
+    !carregando && Boolean(usuario) && emailOk && permissoesConcluidas;
 
   const liberadoRef = useRef(liberado);
 

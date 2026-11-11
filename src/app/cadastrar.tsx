@@ -5,6 +5,8 @@ import { ScrollView, StyleSheet, View } from "react-native";
 import Botao from "../components/Botao";
 import CaixaMarcacao from "../components/CaixaMarcacao";
 import CampoFormulario from "../components/CampoFormulario";
+import MarcaApp from "../components/MarcaApp";
+import Painel from "../components/Painel";
 import SeletorOpcoes from "../components/SeletorOpcoes";
 import Texto from "../components/Texto";
 import { Genero, GENEROS } from "../constants/genero";
@@ -102,136 +104,139 @@ export default function Cadastrar() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.coluna}>
-        <Texto cabecalho style={styles.titulo}>
-          Criar conta
-        </Texto>
+        <Painel>
+          <MarcaApp
+            titulo="Criar conta"
+            subtitulo="Um minuto agora, zero decisões depois"
+          />
 
-        {!firebaseConfigurado() && (
-          <Texto accessibilityRole="alert" style={styles.aviso}>
-            O Firebase ainda não foi configurado. Confira o arquivo .env.
+          {!firebaseConfigurado() && (
+            <Texto accessibilityRole="alert" style={styles.aviso}>
+              O Firebase ainda não foi configurado. Confira o arquivo .env.
+            </Texto>
+          )}
+
+          <CampoFormulario
+            rotulo="Nome"
+            valor={nome}
+            aoMudar={(texto) => {
+              setNome(texto);
+              limpar("nome");
+            }}
+            autoComplete="name"
+            maxLength={60}
+            erro={erros.nome}
+          />
+
+          <CampoFormulario
+            rotulo="E-mail"
+            valor={email}
+            aoMudar={(texto) => {
+              setEmail(texto);
+              limpar("email");
+            }}
+            teclado="email-address"
+            autoComplete="email"
+            ajuda="Vamos enviar um e-mail para confirmar este endereço."
+            erro={erros.email}
+          />
+
+          <SeletorOpcoes
+            rotulo="Gênero"
+            opcoes={GENEROS}
+            valor={genero}
+            aoEscolher={(valor) => {
+              setGenero(valor);
+              limpar("genero");
+            }}
+            erro={erros.genero}
+          />
+
+          <CampoFormulario
+            rotulo="Senha"
+            valor={senha}
+            aoMudar={(texto) => {
+              setSenha(texto);
+              limpar("senha");
+            }}
+            senha
+            autoComplete="new-password"
+            ajuda={`Mínimo de ${SENHA_MINIMA} caracteres, com letras e números.`}
+            erro={erros.senha}
+          />
+
+          <CampoFormulario
+            rotulo="Confirmar senha"
+            valor={confirmacao}
+            aoMudar={(texto) => {
+              setConfirmacao(texto);
+              limpar("confirmacao");
+            }}
+            senha
+            autoComplete="new-password"
+            erro={erros.confirmacao}
+          />
+
+          <Texto cabecalho style={styles.secao}>
+            Avisos
           </Texto>
-        )}
 
-        <CampoFormulario
-          rotulo="Nome"
-          valor={nome}
-          aoMudar={(texto) => {
-            setNome(texto);
-            limpar("nome");
-          }}
-          autoComplete="name"
-          maxLength={60}
-          erro={erros.nome}
-        />
+          <CaixaMarcacao
+            rotulo="Quero receber avisos por e-mail"
+            marcado={notificarEmail}
+            aoAlternar={setNotificarEmail}
+          />
 
-        <CampoFormulario
-          rotulo="E-mail"
-          valor={email}
-          aoMudar={(texto) => {
-            setEmail(texto);
-            limpar("email");
-          }}
-          teclado="email-address"
-          autoComplete="email"
-          ajuda="Vamos enviar um e-mail para confirmar este endereço."
-          erro={erros.email}
-        />
+          <CaixaMarcacao
+            rotulo="Quero receber notificações no aparelho"
+            marcado={notificarPush}
+            aoAlternar={setNotificarPush}
+          />
 
-        <SeletorOpcoes
-          rotulo="Gênero"
-          opcoes={GENEROS}
-          valor={genero}
-          aoEscolher={(valor) => {
-            setGenero(valor);
-            limpar("genero");
-          }}
-          erro={erros.genero}
-        />
-
-        <CampoFormulario
-          rotulo="Senha"
-          valor={senha}
-          aoMudar={(texto) => {
-            setSenha(texto);
-            limpar("senha");
-          }}
-          senha
-          autoComplete="new-password"
-          ajuda={`Mínimo de ${SENHA_MINIMA} caracteres, com letras e números.`}
-          erro={erros.senha}
-        />
-
-        <CampoFormulario
-          rotulo="Confirmar senha"
-          valor={confirmacao}
-          aoMudar={(texto) => {
-            setConfirmacao(texto);
-            limpar("confirmacao");
-          }}
-          senha
-          autoComplete="new-password"
-          erro={erros.confirmacao}
-        />
-
-        <Texto cabecalho style={styles.secao}>
-          Avisos
-        </Texto>
-
-        <CaixaMarcacao
-          rotulo="Quero receber avisos por e-mail"
-          marcado={notificarEmail}
-          aoAlternar={setNotificarEmail}
-        />
-
-        <CaixaMarcacao
-          rotulo="Quero receber notificações no aparelho"
-          marcado={notificarPush}
-          aoAlternar={setNotificarPush}
-        />
-
-        <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
-          Você pode mudar essas escolhas depois. Os avisos só serão enviados se
-          você marcar.
-        </Texto>
-
-        <CaixaMarcacao
-          rotulo="Aceito que o app use meu e-mail, meu gênero e minha localização para funcionar, conforme explicado nesta tela"
-          marcado={aceitouTermos}
-          aoAlternar={(valor) => {
-            setAceitouTermos(valor);
-            limpar("aceitouTermos");
-          }}
-          erro={erros.aceitouTermos}
-        />
-
-        <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
-          O e-mail serve para entrar e para os avisos. O gênero é opcional
-          ("Prefiro não informar"). A localização só é usada na hora de buscar
-          lugares perto de você e não é salva no seu perfil.
-        </Texto>
-
-        {erroGeral !== "" && (
-          <Texto
-            accessibilityRole="alert"
-            style={[styles.erroGeral, { color: cores.erro }]}
-          >
-            {erroGeral}
+          <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
+            Você pode mudar essas escolhas depois. Os avisos só serão enviados
+            se você marcar.
           </Texto>
-        )}
 
-        <Botao
-          titulo={enviando ? "Criando conta..." : "Criar conta"}
-          onPress={enviar}
-          desabilitado={enviando}
-        />
+          <CaixaMarcacao
+            rotulo="Aceito que o app use meu e-mail, meu gênero e minha localização para funcionar, conforme explicado nesta tela"
+            marcado={aceitouTermos}
+            aoAlternar={(valor) => {
+              setAceitouTermos(valor);
+              limpar("aceitouTermos");
+            }}
+            erro={erros.aceitouTermos}
+          />
 
-        <View style={styles.espaco} />
+          <Texto style={[styles.nota, { color: cores.textoSecundario }]}>
+            O e-mail serve para entrar e para os avisos. O gênero é opcional
+            ("Prefiro não informar"). A localização só é usada na hora de buscar
+            lugares perto de você e não é salva no seu perfil.
+          </Texto>
 
-        <Botao
-          titulo="Já tenho conta"
-          secundario
-          onPress={() => router.back()}
-        />
+          {erroGeral !== "" && (
+            <Texto
+              accessibilityRole="alert"
+              style={[styles.erroGeral, { color: cores.erro }]}
+            >
+              {erroGeral}
+            </Texto>
+          )}
+
+          <Botao
+            titulo={enviando ? "Criando conta..." : "Criar conta"}
+            onPress={enviar}
+            desabilitado={enviando}
+          />
+
+          <View style={styles.espaco} />
+
+          <Botao
+            titulo="Já tenho conta"
+            secundario
+            onPress={() => router.back()}
+          />
+        </Painel>
       </View>
     </ScrollView>
   );

@@ -23,6 +23,7 @@ import {
 import { usePreferencias } from "../context/PreferenciasContext";
 import { Respostas } from "../services/salas";
 import { tocarSom } from "../services/sons";
+import BarraProgresso from "./BarraProgresso";
 import Botao from "./Botao";
 import ContagemPrazo from "./ContagemPrazo";
 import Texto from "./Texto";
@@ -235,6 +236,17 @@ function PerguntaAnimada({
   );
 }
 
+const PASSO_DA_ETAPA: Record<EtapaPergunta, number> = {
+  humor: 0,
+  humorEscolhido: 1,
+  gasto: 1,
+  gastoEscolhido: 2,
+  disposicao: 2,
+  disposicaoEscolhida: 3,
+  tempo: 3,
+  tempoEscolhido: 4,
+};
+
 function Tela({ children }: { children: ReactNode }) {
   return (
     <ScrollView
@@ -317,7 +329,6 @@ export default function PerguntasRoleta({
     }, ESPERA_AUTOMATICA_MS);
 
     return () => clearTimeout(temporizador);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, reduzirMovimento]);
 
   function escolherHumor(valor: Humor) {
@@ -378,6 +389,8 @@ export default function PerguntasRoleta({
   if (etapa === "humor") {
     return (
       <Tela>
+        <BarraProgresso total={4} atual={PASSO_DA_ETAPA[etapa]} />
+
         <ContagemPrazo prazoEm={prazoEm} />
 
         <PerguntaAnimada
@@ -437,6 +450,8 @@ export default function PerguntasRoleta({
   if (etapa === "gasto") {
     return (
       <Tela>
+        <BarraProgresso total={4} atual={PASSO_DA_ETAPA[etapa]} />
+
         <PerguntaAnimada
           titulo="Quanto você pretende gastar?"
           descricao="Pode ser sincero. A roleta não julga. Só usa essa informação contra o tédio."
@@ -482,6 +497,8 @@ export default function PerguntasRoleta({
   if (etapa === "disposicao") {
     return (
       <Tela>
+        <BarraProgresso total={4} atual={PASSO_DA_ETAPA[etapa]} />
+
         <PerguntaAnimada
           titulo="Qual é a sua disposição?"
           descricao="O quanto você está disposto a sair da posição atual do sofá?"
@@ -526,6 +543,8 @@ export default function PerguntasRoleta({
   if (etapa === "tempo") {
     return (
       <Tela>
+        <BarraProgresso total={4} atual={PASSO_DA_ETAPA[etapa]} />
+
         <PerguntaAnimada
           titulo="Quanto tempo você tem?"
           descricao="Escolha o tempo que você realmente tem disponível. Não vale colocar 3 horas se você precisa sair em 20 minutos."

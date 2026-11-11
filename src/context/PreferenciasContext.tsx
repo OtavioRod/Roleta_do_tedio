@@ -24,6 +24,14 @@ export type Cores = {
   erro: string;
   destaque: string;
   sobreposicao: string;
+  sombra: string;
+  primaria: string;
+  primariaTexto: string;
+  amarelo: string;
+  verde: string;
+  rosa: string;
+  sobreCor: string;
+  ponto: string;
 };
 
 export const ESCALAS_FONTE = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
@@ -34,30 +42,46 @@ const CHAVE_ARMAZENAMENTO = "@roleta/preferencias";
 
 export const CORES: Record<Tema, Cores> = {
   claro: {
-    fundo: "#ffffff",
-    superficie: "#f2f4f8",
-    texto: "#111111",
-    textoSecundario: "#444444",
-    borda: "#8a8a8a",
-    botao: "#0b5fff",
-    botaoTexto: "#ffffff",
-    botaoDesabilitado: "#9aa5b8",
-    erro: "#b00020",
-    destaque: "#0b5fff",
-    sobreposicao: "rgba(0,0,0,0.5)",
+    fundo: "#FAF3E3",
+    superficie: "#FFFBF4",
+    texto: "#1E130F",
+    textoSecundario: "#635147",
+    borda: "#1E130F",
+    botao: "#F0491C",
+    botaoTexto: "#1E130F",
+    botaoDesabilitado: "#CFC4B2",
+    erro: "#B3000A",
+    destaque: "#CC2D00",
+    sobreposicao: "rgba(30,19,15,0.55)",
+    sombra: "#1E130F",
+    primaria: "#F0491C",
+    primariaTexto: "#CC2D00",
+    amarelo: "#F6D653",
+    verde: "#43BD99",
+    rosa: "#DCA0D6",
+    sobreCor: "#1E130F",
+    ponto: "rgba(30,19,15,0.12)",
   },
   escuro: {
-    fundo: "#121212",
-    superficie: "#1e1e1e",
-    texto: "#ffffff",
-    textoSecundario: "#d0d0d0",
-    borda: "#777777",
-    botao: "#7aa7ff",
-    botaoTexto: "#000000",
-    botaoDesabilitado: "#4a5160",
-    erro: "#ff8a80",
-    destaque: "#7aa7ff",
+    fundo: "#1E130F",
+    superficie: "#2B1D17",
+    texto: "#FAF3E3",
+    textoSecundario: "#D9CBBB",
+    borda: "#FAF3E3",
+    botao: "#F0491C",
+    botaoTexto: "#1E130F",
+    botaoDesabilitado: "#5A4A41",
+    erro: "#FF9A92",
+    destaque: "#FF8A63",
     sobreposicao: "rgba(0,0,0,0.7)",
+    sombra: "#FAF3E3",
+    primaria: "#F0491C",
+    primariaTexto: "#FF8A63",
+    amarelo: "#F6D653",
+    verde: "#43BD99",
+    rosa: "#DCA0D6",
+    sobreCor: "#1E130F",
+    ponto: "rgba(250,243,227,0.10)",
   },
 };
 

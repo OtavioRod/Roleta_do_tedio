@@ -13,6 +13,7 @@ import { urlBuscaNoMapa, urlRota } from "../utils/mapas";
 import BadgeHorario from "./BadgeHorario";
 import Botao from "./Botao";
 import MapaLeaflet from "./MapaLeaflet";
+import { estiloPainel } from "./Painel";
 import Texto from "./Texto";
 
 type Props = {
@@ -208,13 +209,7 @@ export default function ResultadoLocais({
                 return (
                   <View
                     key={local.id}
-                    style={[
-                      styles.card,
-                      {
-                        borderColor: cores.borda,
-                        backgroundColor: cores.superficie,
-                      },
-                    ]}
+                    style={[styles.card, estiloPainel(cores, true)]}
                   >
                     <Texto cabecalho style={styles.nome}>
                       {local.nome}
@@ -232,7 +227,9 @@ export default function ResultadoLocais({
                           { color: cores.textoSecundario },
                         ]}
                       >
-                        Horário não cadastrado no OpenStreetMap.
+                        {local.fonte === "google"
+                          ? "Horário não informado pelo Google Maps."
+                          : "Horário não cadastrado no OpenStreetMap."}
                       </Texto>
                     )}
 
@@ -255,6 +252,27 @@ export default function ResultadoLocais({
                     >
                       {local.endereco}
                     </Texto>
+
+                    {local.fonte && local.fonte !== "osm" && (
+                      <View
+                        style={[
+                          styles.selo,
+                          {
+                            backgroundColor:
+                              local.fonte === "google"
+                                ? cores.amarelo
+                                : cores.verde,
+                            borderColor: cores.borda,
+                          },
+                        ]}
+                      >
+                        <Texto librasIgnorado style={styles.textoSelo}>
+                          {local.fonte === "google"
+                            ? "Encontrado pelo Google Maps"
+                            : "Encontrado pela busca do OpenStreetMap"}
+                        </Texto>
+                      </View>
+                    )}
 
                     {telefone && (
                       <Texto
@@ -488,17 +506,30 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     minWidth: 0,
-    borderWidth: 1,
-    borderRadius: 14,
     padding: 18,
-    marginBottom: 14,
+    marginBottom: 18,
+    marginRight: 6,
+  },
+
+  selo: {
+    alignSelf: "flex-start",
+    borderWidth: 2,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+    marginBottom: 10,
+  },
+
+  textoSelo: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#1E130F",
   },
 
   nome: {
     width: "100%",
     fontSize: 20,
     lineHeight: 26,
-    fontWeight: "800",
     marginBottom: 6,
     flexShrink: 1,
   },

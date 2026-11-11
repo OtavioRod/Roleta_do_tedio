@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Linking, StyleSheet, View } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
+import { buscarLocais, Local, TipoLocal } from "../services/overpass";
 import {
   escolherLocal,
   MembroSala,
@@ -10,9 +11,9 @@ import {
   Sala,
   votarNoLocal,
 } from "../services/salas";
-import { buscarLocais, Local, TipoLocal } from "../services/overpass";
 import Botao from "./Botao";
 import MapaLeaflet from "./MapaLeaflet";
+import { estiloPainel } from "./Painel";
 import Texto from "./Texto";
 
 type Props = {
@@ -116,7 +117,9 @@ export default function EscolhaLocalGrupo({
       );
 
       if (encontrados.length === 0) {
-        setErro("Nenhum lugar foi encontrado por aqui. Tente de novo em instantes.");
+        setErro(
+          "Nenhum lugar foi encontrado por aqui. Tente de novo em instantes.",
+        );
 
         return;
       }
@@ -172,7 +175,7 @@ export default function EscolhaLocalGrupo({
 
   if (locais.length === 0) {
     return (
-      <View style={[styles.caixa, { borderColor: cores.borda }]}>
+      <View style={[styles.caixa, estiloPainel(cores, true)]}>
         <Texto cabecalho style={styles.titulo}>
           Escolham o lugar juntos
         </Texto>
@@ -197,7 +200,10 @@ export default function EscolhaLocalGrupo({
         )}
 
         {erro !== "" && (
-          <Texto accessibilityRole="alert" style={[styles.texto, { color: cores.erro }]}>
+          <Texto
+            accessibilityRole="alert"
+            style={[styles.texto, { color: cores.erro }]}
+          >
             {erro}
           </Texto>
         )}
@@ -206,7 +212,7 @@ export default function EscolhaLocalGrupo({
   }
 
   return (
-    <View style={[styles.caixa, { borderColor: cores.borda }]}>
+    <View style={[styles.caixa, estiloPainel(cores, true)]}>
       <Texto cabecalho style={styles.titulo}>
         {escolhido ? "Lugar escolhido" : "Votem no lugar"}
       </Texto>
@@ -219,7 +225,10 @@ export default function EscolhaLocalGrupo({
 
           <Texto style={styles.texto}>{escolhido.endereco}</Texto>
 
-          <Botao titulo="Abrir no mapa" onPress={() => abrirNoMapa(escolhido)} />
+          <Botao
+            titulo="Abrir no mapa"
+            onPress={() => abrirNoMapa(escolhido)}
+          />
         </>
       ) : null}
 
@@ -242,7 +251,10 @@ export default function EscolhaLocalGrupo({
             style={[
               styles.item,
               {
-                borderColor: local.id === sala.localEscolhidoId ? cores.texto : cores.borda,
+                borderColor:
+                  local.id === sala.localEscolhidoId
+                    ? cores.texto
+                    : cores.borda,
               },
             ]}
           >
@@ -273,7 +285,9 @@ export default function EscolhaLocalGrupo({
         <Botao
           titulo="Fechar votação agora"
           secundario
-          onPress={() => escolherLocal(sala.codigo, vencedorId).catch(() => undefined)}
+          onPress={() =>
+            escolherLocal(sala.codigo, vencedorId).catch(() => undefined)
+          }
         />
       )}
 
@@ -284,7 +298,10 @@ export default function EscolhaLocalGrupo({
       )}
 
       {erro !== "" && (
-        <Texto accessibilityRole="alert" style={[styles.texto, { color: cores.erro }]}>
+        <Texto
+          accessibilityRole="alert"
+          style={[styles.texto, { color: cores.erro }]}
+        >
           {erro}
         </Texto>
       )}
@@ -295,10 +312,9 @@ export default function EscolhaLocalGrupo({
 const styles = StyleSheet.create({
   caixa: {
     width: "100%",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
+    padding: 16,
     marginBottom: 20,
+    marginRight: 6,
   },
 
   titulo: {

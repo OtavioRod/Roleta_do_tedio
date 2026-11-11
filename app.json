@@ -55,7 +55,8 @@
         }
       ],
       "expo-notifications",
-      "expo-audio"
+      "expo-audio",
+      "expo-font"
     ],
     "extra": {
       "router": {},

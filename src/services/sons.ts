@@ -1,4 +1,8 @@
-import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from "expo-audio";
+import {
+  createAudioPlayer,
+  setAudioModeAsync,
+  type AudioPlayer,
+} from "expo-audio";
 
 export type NomeSom =
   | "clique"
@@ -53,9 +57,7 @@ function configurarModo() {
     Promise.resolve(setAudioModeAsync({ playsInSilentMode: true })).catch(
       () => undefined,
     );
-  } catch {
-    // segue sem alterar o modo de áudio
-  }
+  } catch {}
 }
 
 function obterJogador(nome: NomeSom) {
@@ -85,9 +87,7 @@ export function tocarSom(nome: NomeSom) {
       .finally(() => {
         try {
           jogador.play();
-        } catch {
-          // o navegador pode bloquear o som antes do primeiro toque
-        }
+        } catch {}
       });
   } catch (erro) {
     if (__DEV__) {
@@ -99,7 +99,5 @@ export function tocarSom(nome: NomeSom) {
 export function pararSom(nome: NomeSom) {
   try {
     jogadores[nome]?.pause();
-  } catch {
-    // nada a fazer
-  }
+  } catch {}
 }

@@ -6,6 +6,7 @@ import { usePreferencias } from "../context/PreferenciasContext";
 import { montarLinkSala } from "../services/linkSala";
 import { compartilharTexto } from "../utils/compartilhar";
 import Botao from "./Botao";
+import { estiloPainel } from "./Painel";
 import Texto from "./Texto";
 
 type Props = {
@@ -34,7 +35,7 @@ export default function ConviteSala({ codigo }: Props) {
   }
 
   return (
-    <View style={[styles.caixa, { borderColor: cores.borda }]}>
+    <View style={[styles.caixa, estiloPainel(cores, true)]}>
       <Texto cabecalho style={styles.titulo}>
         Chame por link ou QR code
       </Texto>
@@ -45,14 +46,23 @@ export default function ConviteSala({ codigo }: Props) {
         accessibilityRole="image"
         accessibilityLabel={`QR code da sala ${codigo}. Aponte a câmera para entrar.`}
       >
-        <QRCode value={link} size={160} backgroundColor="#FFFFFF" color="#000000" />
+        <QRCode
+          value={link}
+          size={160}
+          backgroundColor="#FFFFFF"
+          color="#000000"
+        />
       </View>
 
       <Texto selectable style={styles.link}>
         {link}
       </Texto>
 
-      <Botao titulo="Compartilhar link da sala" secundario onPress={compartilhar} />
+      <Botao
+        titulo="Compartilhar link da sala"
+        secundario
+        onPress={compartilhar}
+      />
 
       {aviso !== "" && (
         <Texto accessibilityRole="alert" style={styles.aviso}>
@@ -65,10 +75,9 @@ export default function ConviteSala({ codigo }: Props) {
 
 const styles = StyleSheet.create({
   caixa: {
-    borderWidth: 1,
-    borderRadius: 14,
     padding: 16,
     marginBottom: 20,
+    marginRight: 6,
     alignItems: "center",
   },
 

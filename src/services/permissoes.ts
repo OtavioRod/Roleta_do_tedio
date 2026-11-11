@@ -64,8 +64,6 @@ export async function configurarNotificacoes() {
           | Record<string, unknown>
           | undefined;
 
-        // Com o app aberto, o aviso na tela e o som já cobrem a sala atual,
-        // convites e pedidos de amizade; mostrar de novo seria duplicado.
         const jaCoberta =
           (typeof dados?.salaCodigo === "string" &&
             dados.salaCodigo === salaAbertaAgora) ||

@@ -1,12 +1,6 @@
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  View,
-} from "react-native";
+import { Platform, ScrollView, StyleSheet, Switch, View } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
@@ -18,6 +12,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import Botao from "../components/Botao";
+import { estiloPainel } from "../components/Painel";
 import Texto from "../components/Texto";
 import TouchableLibras from "../components/TouchableLibras";
 import { rotuloGenero } from "../constants/genero";
@@ -28,16 +23,16 @@ import {
   lerEntradaNativaAtivada,
 } from "../services/entradaNativa";
 import {
+  EstadoPermissao,
+  estadoLocalizacao,
+  estadoNotificacoes,
+} from "../services/permissoes";
+import {
   carregarPreferenciasAudio,
   obterPreferenciasAudio,
   salvarPreferenciasAudio,
   vibrar,
 } from "../services/preferenciasAudio";
-import {
-  EstadoPermissao,
-  estadoLocalizacao,
-  estadoNotificacoes,
-} from "../services/permissoes";
 
 const TEXTO_ESTADO: Record<EstadoPermissao, string> = {
   concedida: "Permitida",
@@ -108,10 +103,7 @@ function Secao({ titulo, children }: SecaoProps) {
   return (
     <Animated.View
       layout={LinearTransition.duration(300)}
-      style={[
-        styles.cartao,
-        { borderColor: cores.borda, backgroundColor: cores.superficie },
-      ]}
+      style={[styles.cartao, estiloPainel(cores, true)]}
     >
       <TouchableLibras
         textoTraducao={titulo}
@@ -125,11 +117,7 @@ function Secao({ titulo, children }: SecaoProps) {
           {titulo}
         </Texto>
         <Animated.Text
-          style={[
-            styles.indicador,
-            { color: cores.destaque },
-            estiloIndicador,
-          ]}
+          style={[styles.indicador, { color: cores.destaque }, estiloIndicador]}
         >
           ›
         </Animated.Text>
@@ -272,7 +260,7 @@ export default function Perfil() {
     !!usuario && uidEntradaNativaCarregada !== usuario.uid;
   const mensagemErroEntradaNativa =
     usuario?.uid === erroEntradaNativa?.uid
-      ? erroEntradaNativa?.mensagem ?? ""
+      ? (erroEntradaNativa?.mensagem ?? "")
       : "";
 
   async function alterarEntradaNativa(ativada: boolean) {
@@ -289,15 +277,13 @@ export default function Perfil() {
         setPreferenciaEntradaNativa({ uid: usuario.uid, ativada });
       }
     } catch (erro) {
-      setErroEntradaNativa(
-        {
-          uid: usuario?.uid ?? "",
-          mensagem:
-            erro instanceof ErroEntradaNativa
-              ? erro.message
-              : "Não foi possível salvar a preferência de entrada nativa.",
-        },
-      );
+      setErroEntradaNativa({
+        uid: usuario?.uid ?? "",
+        mensagem:
+          erro instanceof ErroEntradaNativa
+            ? erro.message
+            : "Não foi possível salvar a preferência de entrada nativa.",
+      });
     } finally {
       setAlterandoEntradaNativa(false);
     }
@@ -309,6 +295,34 @@ export default function Perfil() {
         <Texto cabecalho style={styles.titulo}>
           Meu perfil
         </Texto>
+
+        <View style={[styles.cabecalhoPerfil, estiloPainel(cores)]}>
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              styles.avatar,
+              { backgroundColor: cores.primaria, borderColor: cores.borda },
+            ]}
+          >
+            <Texto librasIgnorado cabecalho style={styles.avatarLetra}>
+              {(nome || email || "?").trim().charAt(0).toUpperCase()}
+            </Texto>
+          </View>
+
+          <View style={styles.dadosPerfil}>
+            <Texto cabecalho numberOfLines={1} style={styles.nomePerfil}>
+              {nome}
+            </Texto>
+
+            <Texto
+              numberOfLines={1}
+              style={[styles.emailPerfil, { color: cores.textoSecundario }]}
+            >
+              {email}
+            </Texto>
+          </View>
+        </View>
 
         <Secao titulo="Conta conectada">
           <Linha rotulo="Nome" valor={nome} />
@@ -469,14 +483,49 @@ const styles = StyleSheet.create({
   },
 
   titulo: {
+    fontSize: 40,
+    lineHeight: 44,
+    marginBottom: 14,
+  },
+
+  cabecalhoPerfil: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    padding: 18,
+    marginBottom: 18,
+    marginRight: 8,
+  },
+
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  avatarLetra: {
     fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 10,
+    lineHeight: 34,
+    color: "#1E130F",
+  },
+
+  dadosPerfil: {
+    flex: 1,
+  },
+
+  nomePerfil: {
+    fontSize: 24,
+  },
+
+  emailPerfil: {
+    fontSize: 15,
   },
 
   secao: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 22,
     flex: 1,
   },
 
@@ -507,10 +556,10 @@ const styles = StyleSheet.create({
   },
 
   cartao: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    marginTop: 16,
+    paddingHorizontal: 18,
+    marginTop: 8,
+    marginBottom: 14,
+    marginRight: 6,
   },
 
   cabecalhoSecao: {

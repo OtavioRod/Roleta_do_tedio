@@ -41,7 +41,7 @@ test.describe("Acessibilidade automática (axe, WCAG 2.2 AA)", () => {
     await page.getByLabel("E-mail").focus();
     await page.keyboard.press("Tab");
 
-    await expect(page.getByLabel("Senha")).toBeFocused();
+    await expect(page.getByLabel("Senha", { exact: true })).toBeFocused();
   });
 
   test.describe("logado", () => {

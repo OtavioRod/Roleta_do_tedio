@@ -7,6 +7,7 @@ import ContagemPrazo from "../../components/ContagemPrazo";
 import ConviteSala from "../../components/ConviteSala";
 import EscolhaLocalGrupo from "../../components/EscolhaLocalGrupo";
 import ExplicacaoResultado from "../../components/ExplicacaoResultado";
+import { estiloPainel } from "../../components/Painel";
 import PerguntasRoleta from "../../components/PerguntasRoleta";
 import RoletaAtividades from "../../components/RoletaAtividades";
 import Texto from "../../components/Texto";
@@ -20,36 +21,36 @@ import { anunciar, notificar } from "../../services/notificar";
 import { TipoLocal } from "../../services/overpass";
 import { definirSalaAberta } from "../../services/permissoes";
 import {
-    criarSala as _criarSalaNaoUsada,
-    confirmarResultado,
-    definirDiscreto,
-    definirResultado,
-    entrarNaSala,
-    enviarProgresso,
-    enviarRespostas,
-    girarDeNovo,
-    iniciarRodada,
-    MembroSala,
-    observarMembros,
-    observarSala,
-    registrarPresenca,
-    removerParticipante,
-    Respostas,
-    sairDaSala,
-    Sala,
-    votarNoResultado,
+  criarSala as _criarSalaNaoUsada,
+  confirmarResultado,
+  definirDiscreto,
+  definirResultado,
+  entrarNaSala,
+  enviarProgresso,
+  enviarRespostas,
+  girarDeNovo,
+  iniciarRodada,
+  MembroSala,
+  observarMembros,
+  observarSala,
+  registrarPresenca,
+  removerParticipante,
+  Respostas,
+  sairDaSala,
+  Sala,
+  votarNoResultado,
 } from "../../services/salas";
+import { tocarSom } from "../../services/sons";
 import { normalizarCodigo } from "../../utils/codigos";
 import { compartilharTexto } from "../../utils/compartilhar";
 import { mensagemErroSocial } from "../../utils/mensagensSociais";
-import { tocarSom } from "../../services/sons";
 import {
-    apurarVotacao,
-    criarSorteioDeterministico,
-    MembroParaDecisao,
-    ParticipanteGrupo,
-    participantesDaRodada,
-    sortearParaSala,
+  apurarVotacao,
+  criarSorteioDeterministico,
+  MembroParaDecisao,
+  ParticipanteGrupo,
+  participantesDaRodada,
+  sortearParaSala,
 } from "../../utils/recomendacao";
 
 void _criarSalaNaoUsada;
@@ -266,7 +267,6 @@ export default function TelaSala() {
         quando: "segundoPlano",
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sala?.estado, sala?.tentativa, sala?.confirmada]);
 
   useEffect(() => {
@@ -508,14 +508,12 @@ export default function TelaSala() {
       return undefined;
     }
 
-    // O servidor calcula primeiro; se ele não responder, um membro assume.
     const reserva = setTimeout(
       () => gravarResultado(participantes).catch(aoFalhar),
       10000,
     );
 
     return () => clearTimeout(reserva);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sala, membros, souDono, souMembro]);
 
   useEffect(() => {
@@ -540,7 +538,6 @@ export default function TelaSala() {
         setErro(mensagemErroSocial(falha)),
       );
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agora, sala, membros, souDono]);
 
   useEffect(() => {
@@ -655,7 +652,8 @@ export default function TelaSala() {
 
     const outros = sala.membrosUids.filter((membroUid) => membroUid !== uid);
 
-    const proximoUid = souDono && passarComando === true ? outros[0] : undefined;
+    const proximoUid =
+      souDono && passarComando === true ? outros[0] : undefined;
 
     const proximo = proximoUid
       ? {
@@ -996,10 +994,7 @@ export default function TelaSala() {
           return (
             <View
               key={membroUid}
-              style={[
-                styles.cartaoMembro,
-                { borderColor: cores.borda, backgroundColor: cores.superficie },
-              ]}
+              style={[styles.cartaoMembro, estiloPainel(cores, true)]}
             >
               <Texto style={styles.nomeMembro}>
                 {membro?.nome || "Participante"}
@@ -1069,13 +1064,7 @@ export default function TelaSala() {
                 return (
                   <View
                     key={amizade.id}
-                    style={[
-                      styles.cartaoMembro,
-                      {
-                        borderColor: cores.borda,
-                        backgroundColor: cores.superficie,
-                      },
-                    ]}
+                    style={[styles.cartaoMembro, estiloPainel(cores, true)]}
                   >
                     <Texto style={styles.nomeMembro}>{amizade.amigoNome}</Texto>
 
@@ -1112,7 +1101,9 @@ export default function TelaSala() {
               <>
                 <Botao
                   titulo={
-                    sala.discreto ? "Modo discreto: ligado" : "Modo discreto: desligado"
+                    sala.discreto
+                      ? "Modo discreto: ligado"
+                      : "Modo discreto: desligado"
                   }
                   secundario
                   onPress={alternarDiscreto}
@@ -1190,13 +1181,22 @@ export default function TelaSala() {
             </Texto>
 
             <View
-              style={[styles.cartaoResultado, { borderColor: cores.texto }]}
+              style={[
+                styles.cartaoResultado,
+                estiloPainel(cores),
+                { backgroundColor: cores.amarelo },
+              ]}
             >
-              <Texto cabecalho style={styles.resultadoTitulo}>
+              <Texto
+                cabecalho
+                style={[styles.resultadoTitulo, { color: cores.sobreCor }]}
+              >
                 {sala.resultado.atividadeNome}
               </Texto>
 
-              <Texto style={styles.texto}>{atividade?.descricao ?? ""}</Texto>
+              <Texto style={[styles.texto, { color: cores.sobreCor }]}>
+                {atividade?.descricao ?? ""}
+              </Texto>
             </View>
 
             {atividade && (
@@ -1258,7 +1258,10 @@ export default function TelaSala() {
             </Texto>
 
             {sala.historico.map((item) => (
-              <Texto key={`${item.rodada}-${item.atividadeId}`} style={styles.texto}>
+              <Texto
+                key={`${item.rodada}-${item.atividadeId}`}
+                style={styles.texto}
+              >
                 Rodada {item.rodada}: {item.atividadeNome}
               </Texto>
             ))}
@@ -1384,10 +1387,9 @@ const styles = StyleSheet.create({
   },
 
   cartaoMembro: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
+    padding: 14,
+    marginBottom: 14,
+    marginRight: 6,
   },
 
   nomeMembro: {
@@ -1397,10 +1399,9 @@ const styles = StyleSheet.create({
   },
 
   cartaoResultado: {
-    borderWidth: 2,
-    borderRadius: 12,
-    padding: 18,
-    marginBottom: 14,
+    padding: 20,
+    marginBottom: 20,
+    marginRight: 8,
   },
 
   resultadoTitulo: {

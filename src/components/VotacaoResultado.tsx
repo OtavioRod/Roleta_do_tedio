@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 import { usePreferencias } from "../context/PreferenciasContext";
 import { MembroSala, VotoSala } from "../services/salas";
 import Botao from "./Botao";
+import { estiloPainel } from "./Painel";
 import Texto from "./Texto";
 
 type Props = {
@@ -31,7 +32,7 @@ export default function VotacaoResultado({
   const jaVotei = meuVoto !== null && meuVoto.tentativa === tentativa;
 
   return (
-    <View style={[styles.caixa, { borderColor: cores.borda }]}>
+    <View style={[styles.caixa, estiloPainel(cores, true)]}>
       <Texto cabecalho style={styles.titulo}>
         O grupo topa?
       </Texto>
@@ -45,7 +46,8 @@ export default function VotacaoResultado({
 
       {jaVotei ? (
         <Texto style={styles.texto} accessibilityRole="alert">
-          Você votou {meuVoto?.valor === "topo" ? "“topamos”" : "“girar de novo”"}.
+          Você votou{" "}
+          {meuVoto?.valor === "topo" ? "“topamos”" : "“girar de novo”"}.
           Esperando os outros ({votaram} de {membros.length} já votaram).
         </Texto>
       ) : (
@@ -82,10 +84,9 @@ export default function VotacaoResultado({
 const styles = StyleSheet.create({
   caixa: {
     width: "100%",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
+    padding: 16,
     marginBottom: 20,
+    marginRight: 6,
   },
 
   titulo: {

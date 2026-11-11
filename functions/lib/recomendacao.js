@@ -1,5 +1,3 @@
-// Espelho de src/utils/recomendacao.ts. A conta precisa ser idêntica à do app,
-// porque o app usa o mesmo sorteio como reserva se o servidor demorar.
 const { atividades, OPCOES_GASTO, OPCOES_TEMPO } = require("./dados");
 
 function criarSorteioDeterministico(semente) {
@@ -85,11 +83,17 @@ function pontuar(atividade, participantes) {
       pontos += 2;
     }
 
-    if (participante.humor === "preguiça" && atividade.disposicao.includes("baixa")) {
+    if (
+      participante.humor === "preguiça" &&
+      atividade.disposicao.includes("baixa")
+    ) {
       pontos += 2;
     }
 
-    if (participante.humor === "animado" && atividade.disposicao.includes("alta")) {
+    if (
+      participante.humor === "animado" &&
+      atividade.disposicao.includes("alta")
+    ) {
       pontos += 2;
     }
 
@@ -101,7 +105,10 @@ function pontuar(atividade, participantes) {
       pontos += 2;
     }
 
-    if (participante.humor === "tranquilo" && atividade.disposicao.includes("baixa")) {
+    if (
+      participante.humor === "tranquilo" &&
+      atividade.disposicao.includes("baixa")
+    ) {
       pontos += 2;
     }
 
@@ -113,12 +120,20 @@ function pontuar(atividade, participantes) {
   return pontos;
 }
 
-function escolherAtividadeDoGrupo(participantes, sorteio = Math.random, excluirIds = []) {
-  const permitidas = atividades.filter((atividade) => !excluirIds.includes(atividade.id));
+function escolherAtividadeDoGrupo(
+  participantes,
+  sorteio = Math.random,
+  excluirIds = [],
+) {
+  const permitidas = atividades.filter(
+    (atividade) => !excluirIds.includes(atividade.id),
+  );
 
   const base = permitidas.length > 0 ? permitidas : atividades;
 
-  const validas = base.filter((atividade) => podeSerEscolhida(atividade, participantes));
+  const validas = base.filter((atividade) =>
+    podeSerEscolhida(atividade, participantes),
+  );
 
   if (validas.length === 0) {
     return {
@@ -168,7 +183,10 @@ function apurarVotacao(membros, tentativa) {
   }
 
   const todosVotaram = membros.every(
-    (membro) => membro.voto && membro.voto.tentativa === tentativa && (membro.voto.valor === "topo" || membro.voto.valor === "nao"),
+    (membro) =>
+      membro.voto &&
+      membro.voto.tentativa === tentativa &&
+      (membro.voto.valor === "topo" || membro.voto.valor === "nao"),
   );
 
   if (!todosVotaram) {

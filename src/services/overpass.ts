@@ -19,6 +19,8 @@ export type Local = {
   instagram?: string;
   facebook?: string;
   osmUrl?: string;
+  fonte?: "osm" | "nominatim" | "google";
+  googleMapsUrl?: string;
   distanciaMetros?: number;
 };
 
@@ -47,6 +49,10 @@ type TagsOverpass = {
   "contact:instagram"?: string;
   facebook?: string;
   "contact:facebook"?: string;
+
+  fonte?: string;
+  "google:uri"?: string;
+  "google:place_id"?: string;
 };
 
 type ElementoOverpass = {
@@ -268,7 +274,19 @@ function transformarElemento(
       tags?.facebook ?? tags?.["contact:facebook"],
       "https://www.facebook.com/",
     ),
-    osmUrl: `https://www.openstreetmap.org/${elemento.type}/${elemento.id}`,
+    osmUrl:
+      tags?.fonte === "google"
+        ? undefined
+        : `https://www.openstreetmap.org/${elemento.type}/${elemento.id}`,
+    fonte:
+      tags?.fonte === "google"
+        ? "google"
+        : tags?.fonte === "nominatim"
+          ? "nominatim"
+          : "osm",
+    googleMapsUrl:
+      tags?.["google:uri"] ??
+      `https://www.google.com/maps/search/?api=1&query=${coordenadas.latitude},${coordenadas.longitude}`,
     distanciaMetros: calcularDistancia(
       origemLat,
       origemLon,
@@ -279,15 +297,29 @@ function transformarElemento(
 }
 
 function mesclar(base: Local, outro: Local): Local {
+  const principal =
+    base.fonte === "google" && outro.fonte !== "google" ? outro : base;
+  const secundario = principal === base ? outro : base;
+
+  const googleMapsUrl =
+    principal.fonte === "google"
+      ? principal.googleMapsUrl
+      : secundario.fonte === "google"
+        ? secundario.googleMapsUrl
+        : principal.googleMapsUrl;
+
   return {
-    ...base,
+    ...principal,
     endereco:
-      base.endereco === ENDERECO_PADRAO ? outro.endereco : base.endereco,
-    horario: base.horario ?? outro.horario,
-    website: base.website ?? outro.website,
-    telefone: base.telefone ?? outro.telefone,
-    instagram: base.instagram ?? outro.instagram,
-    facebook: base.facebook ?? outro.facebook,
+      principal.endereco === ENDERECO_PADRAO
+        ? secundario.endereco
+        : principal.endereco,
+    horario: principal.horario ?? secundario.horario,
+    website: principal.website ?? secundario.website,
+    telefone: principal.telefone ?? secundario.telefone,
+    instagram: principal.instagram ?? secundario.instagram,
+    facebook: principal.facebook ?? secundario.facebook,
+    googleMapsUrl,
   };
 }
 
