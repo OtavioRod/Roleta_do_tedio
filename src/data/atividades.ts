@@ -62,7 +62,7 @@ export const atividades: Atividade[] = [
 
     chuvaPermitida: true,
 
-    tipoApi: "geoapify",
+    tipoApi: "overpass",
 
     modalidades: [
       {
@@ -122,7 +122,7 @@ export const atividades: Atividade[] = [
 
     chuvaPermitida: true,
 
-    tipoApi: "geoapify",
+    tipoApi: "overpass",
   },
 
   {
@@ -144,7 +144,7 @@ export const atividades: Atividade[] = [
 
     chuvaPermitida: true,
 
-    tipoApi: "geoapify",
+    tipoApi: "overpass",
   },
 
   {
@@ -208,7 +208,7 @@ export const atividades: Atividade[] = [
 
     chuvaPermitida: true,
 
-    tipoApi: "ticketmaster",
+    tipoApi: "nawhe",
   },
 
   {
@@ -230,7 +230,7 @@ export const atividades: Atividade[] = [
 
     chuvaPermitida: true,
 
-    tipoApi: "tmdb",
+    tipoApi: "local",
   },
 
   {
