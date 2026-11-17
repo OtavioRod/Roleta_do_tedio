@@ -33,7 +33,12 @@ export default function RoletaEstatica({ tamanho = 240 }: Props) {
   const centro = tamanho / 2;
   const raio = centro - 6;
   const fatia = 360 / ROTULOS.length;
-  const preenchimentos = [cores.primaria, cores.amarelo, cores.verde, cores.rosa];
+  const preenchimentos = [
+    cores.primaria,
+    cores.amarelo,
+    cores.verde,
+    cores.rosa,
+  ];
 
   return (
     <View
@@ -53,73 +58,70 @@ export default function RoletaEstatica({ tamanho = 240 }: Props) {
         ]}
       />
 
-      <Svg width={tamanho} height={tamanho} style={styles.roda}>
-        {ROTULOS.map((rotulo, indice) => {
-          const inicio = -90 + indice * fatia;
-          const fim = inicio + fatia;
-          const a = ponto(centro, raio, inicio);
-          const b = ponto(centro, raio, fim);
-          const meio = ponto(centro, raio * 0.62, inicio + fatia / 2);
+      <View style={styles.roda}>
+        <Svg width={tamanho} height={tamanho}>
+          {ROTULOS.map((rotulo, indice) => {
+            const inicio = -90 + indice * fatia;
+            const fim = inicio + fatia;
+            const a = ponto(centro, raio, inicio);
+            const b = ponto(centro, raio, fim);
+            const meio = ponto(centro, raio * 0.62, inicio + fatia / 2);
 
-          return (
-            <G key={rotulo}>
-              <Path
-                d={`M ${centro} ${centro} L ${a.x} ${a.y} A ${raio} ${raio} 0 0 1 ${b.x} ${b.y} Z`}
-                fill={preenchimentos[indice % preenchimentos.length]}
-                stroke="#1E130F"
-                strokeWidth={3}
-              />
-              <SvgText
-                x={meio.x}
-                y={meio.y}
-                fill="#1E130F"
-                fontSize={tamanho / 20}
-                fontWeight="bold"
-                textAnchor="middle"
-                alignmentBaseline="middle"
-                transform={`rotate(${inicio + fatia / 2 + 90}, ${meio.x}, ${meio.y})`}
-              >
-                {rotulo}
-              </SvgText>
-            </G>
-          );
-        })}
+            return (
+              <G key={rotulo}>
+                <Path
+                  d={`M ${centro} ${centro} L ${a.x} ${a.y} A ${raio} ${raio} 0 0 1 ${b.x} ${b.y} Z`}
+                  fill={preenchimentos[indice % preenchimentos.length]}
+                  stroke="#1E130F"
+                  strokeWidth={3}
+                />
+                <SvgText
+                  x={meio.x}
+                  y={meio.y}
+                  fill="#1E130F"
+                  fontSize={tamanho / 20}
+                  fontWeight="bold"
+                  textAnchor="middle"
+                  alignmentBaseline="middle"
+                  transform={`rotate(${inicio + fatia / 2 + 90}, ${meio.x}, ${meio.y})`}
+                >
+                  {rotulo}
+                </SvgText>
+              </G>
+            );
+          })}
 
-        <Circle
-          cx={centro}
-          cy={centro}
-          r={raio}
-          fill="none"
-          stroke="#1E130F"
-          strokeWidth={5}
-        />
+          <Circle
+            cx={centro}
+            cy={centro}
+            r={raio}
+            fill="none"
+            stroke="#1E130F"
+            strokeWidth={5}
+          />
 
-        <Circle
-          cx={centro}
-          cy={centro}
-          r={tamanho / 11}
-          fill="#FFFBF4"
-          stroke="#1E130F"
-          strokeWidth={4}
-        />
+          <Circle
+            cx={centro}
+            cy={centro}
+            r={tamanho / 11}
+            fill="#FFFBF4"
+            stroke="#1E130F"
+            strokeWidth={4}
+          />
 
-        <SvgText
-          x={centro}
-          y={centro + tamanho / 40}
-          fontSize={tamanho / 11}
-          textAnchor="middle"
-          alignmentBaseline="middle"
-        >
-          😴
-        </SvgText>
-      </Svg>
+          <SvgText
+            x={centro}
+            y={centro + tamanho / 40}
+            fontSize={tamanho / 11}
+            textAnchor="middle"
+            alignmentBaseline="middle"
+          >
+            😴
+          </SvgText>
+        </Svg>
+      </View>
 
-      <View
-        style={[
-          styles.seta,
-          { borderTopColor: cores.borda, top: 0 },
-        ]}
-      />
+      <View style={[styles.seta, { borderTopColor: cores.borda, top: 0 }]} />
     </View>
   );
 }
@@ -135,16 +137,19 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 8,
     bottom: 0,
+    zIndex: 0,
   },
 
   roda: {
     marginBottom: 8,
+    zIndex: 1,
   },
 
   seta: {
     position: "absolute",
     left: "50%",
     marginLeft: -14,
+    zIndex: 2,
     width: 0,
     height: 0,
     borderLeftWidth: 14,

@@ -1,3 +1,4 @@
+import { buscarDireto } from "./buscaDireta";
 import { BACKEND_URL } from "./config";
 
 export type TipoLocal =
@@ -72,7 +73,26 @@ type ElementoOverpass = {
 
 type RespostaOverpass = {
   elements: ElementoOverpass[];
+  fontes?: string[];
 };
+
+export type DiagnosticoBusca = {
+  servidor: "nao-consultado" | "ok" | "vazio" | "falhou";
+  direto: "nao-usado" | "ok" | "vazio" | "falhou";
+  fontes: string[];
+  raioMaximoMetros: number;
+};
+
+let ultimoDiagnostico: DiagnosticoBusca = {
+  servidor: "nao-consultado",
+  direto: "nao-usado",
+  fontes: [],
+  raioMaximoMetros: 0,
+};
+
+export function obterUltimoDiagnostico() {
+  return ultimoDiagnostico;
+}
 
 const TEMPO_LIMITE_MS = 45000;
 const ESPERA_NOVA_TENTATIVA_MS = 3000;
@@ -375,11 +395,15 @@ function montarRaios(raio: number) {
   return raios.filter((valor, indice) => raios.indexOf(valor) === indice);
 }
 
-async function consultarBackend(corpo: object): Promise<RespostaOverpass> {
-  for (let tentativa = 0; tentativa < 2; tentativa += 1) {
+async function consultarBackend(
+  corpo: object,
+  tentativas = 2,
+  tempoLimite = TEMPO_LIMITE_MS,
+): Promise<RespostaOverpass> {
+  for (let tentativa = 0; tentativa < tentativas; tentativa += 1) {
     const controlador = new AbortController();
 
-    const temporizador = setTimeout(() => controlador.abort(), TEMPO_LIMITE_MS);
+    const temporizador = setTimeout(() => controlador.abort(), tempoLimite);
 
     try {
       const resposta = await fetch(`${BACKEND_URL}/locais`, {
@@ -409,7 +433,7 @@ async function consultarBackend(corpo: object): Promise<RespostaOverpass> {
 
       const repetivel = erro instanceof ErroHttp ? erro.status >= 500 : true;
 
-      if (tentativa === 0 && repetivel) {
+      if (tentativa < tentativas - 1 && repetivel) {
         await esperar(ESPERA_NOVA_TENTATIVA_MS);
         continue;
       }
@@ -421,6 +445,71 @@ async function consultarBackend(corpo: object): Promise<RespostaOverpass> {
   }
 
   throw new Error("Falha ao consultar o servidor.");
+}
+
+async function consultarComReserva(
+  corpo: {
+    latitude: number;
+    longitude: number;
+    tipo: TipoLocal;
+    raio: number;
+    filtros: string[];
+  },
+  diagnostico: DiagnosticoBusca,
+): Promise<ElementoOverpass[]> {
+  let elementos: ElementoOverpass[] = [];
+  let erroServidor: unknown = null;
+
+  try {
+    const dados = await consultarBackend(corpo, 1, 25000);
+
+    elementos = dados.elements;
+
+    diagnostico.servidor = elementos.length > 0 ? "ok" : "vazio";
+
+    for (const fonte of dados.fontes ?? []) {
+      if (!diagnostico.fontes.includes(fonte)) {
+        diagnostico.fontes.push(fonte);
+      }
+    }
+  } catch (erro) {
+    erroServidor = erro;
+    diagnostico.servidor = "falhou";
+  }
+
+  if (elementos.length > 0) {
+    return elementos;
+  }
+
+  try {
+    const direto = await buscarDireto(
+      corpo.latitude,
+      corpo.longitude,
+      corpo.raio,
+      corpo.tipo,
+      corpo.filtros,
+    );
+
+    diagnostico.direto = direto.elementos.length > 0 ? "ok" : "vazio";
+
+    for (const fonte of direto.fontes) {
+      const nome = `${fonte} (direto)`;
+
+      if (!diagnostico.fontes.includes(nome)) {
+        diagnostico.fontes.push(nome);
+      }
+    }
+
+    return direto.elementos as ElementoOverpass[];
+  } catch (erroDireto) {
+    diagnostico.direto = "falhou";
+
+    if (diagnostico.servidor === "falhou") {
+      throw erroServidor ?? erroDireto;
+    }
+
+    return [];
+  }
 }
 
 export async function buscarLocais(
@@ -443,19 +532,35 @@ export async function buscarLocais(
 
   let consultaConcluida = false;
 
+  const diagnostico: DiagnosticoBusca = {
+    servidor: "nao-consultado",
+    direto: "nao-usado",
+    fontes: [],
+    raioMaximoMetros: 0,
+  };
+
+  ultimoDiagnostico = diagnostico;
+
   for (let indice = 0; indice < raios.length; indice += 1) {
     try {
-      const dados = await consultarBackend({
-        latitude,
-        longitude,
-        tipo,
-        raio: raios[indice],
-        filtros,
-      });
+      diagnostico.servidor = "nao-consultado";
+      diagnostico.direto = "nao-usado";
+      diagnostico.raioMaximoMetros = raios[indice];
+
+      const elementos = await consultarComReserva(
+        {
+          latitude,
+          longitude,
+          tipo,
+          raio: raios[indice],
+          filtros,
+        },
+        diagnostico,
+      );
 
       consultaConcluida = true;
 
-      locais = processarElementos(dados.elements, latitude, longitude);
+      locais = processarElementos(elementos, latitude, longitude);
 
       if (__DEV__) {
         const comHorario = locais.filter((local) => local.horario).length;

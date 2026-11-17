@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Linking, Platform, StyleSheet, View } from "react-native";
 
 import { usePreferencias } from "../context/PreferenciasContext";
-import { Local } from "../services/overpass";
+import { Local, obterUltimoDiagnostico } from "../services/overpass";
 import { urlSessoes } from "../utils/cinema";
 import {
   avaliarHorario,
@@ -68,6 +68,22 @@ async function abrirLink(url: string) {
   } catch (erro) {
     console.error("Não foi possível abrir o link:", erro);
   }
+}
+
+function explicarFalta(diagnostico: ReturnType<typeof obterUltimoDiagnostico>) {
+  const raioKm = Math.round(diagnostico.raioMaximoMetros / 1000);
+
+  const area = raioKm > 0 ? ` num raio de até ${raioKm} km` : "";
+
+  if (diagnostico.servidor === "falhou" && diagnostico.direto === "falhou") {
+    return "Não conseguimos consultar nenhuma fonte de mapas agora. Confira a internet e tente de novo em instantes. O mapa abaixo mostra onde você está.";
+  }
+
+  if (diagnostico.direto === "vazio" || diagnostico.servidor === "vazio") {
+    return `Consultamos o OpenStreetMap${area} e não há esse tipo de lugar cadastrado por aí. O mapa abaixo mostra onde você está.`;
+  }
+
+  return "Isso pode acontecer porque o OpenStreetMap ainda não possui esses locais cadastrados na região. O mapa abaixo mostra onde você está.";
 }
 
 export default function ResultadoLocais({
@@ -143,20 +159,22 @@ export default function ResultadoLocais({
         </Texto>
 
         {locais.length === 0 ? (
-          <View
-            style={[
-              styles.semResultados,
-              { borderColor: cores.borda, backgroundColor: cores.superficie },
-            ]}
-          >
+          <View style={[styles.semResultados, estiloPainel(cores)]}>
             <Texto cabecalho style={styles.semResultadosTitulo}>
               Não encontramos opções próximas.
             </Texto>
 
             <Texto style={styles.semResultadosTexto}>
-              Isso pode acontecer porque o OpenStreetMap ainda não possui esses
-              locais cadastrados na região.
+              {explicarFalta(obterUltimoDiagnostico())}
             </Texto>
+
+            <View style={styles.mapaContainer}>
+              <MapaLeaflet
+                latitude={latitude}
+                longitude={longitude}
+                locais={[]}
+              />
+            </View>
           </View>
         ) : (
           <>
@@ -611,9 +629,9 @@ const styles = StyleSheet.create({
   semResultados: {
     width: "100%",
     minWidth: 0,
-    borderWidth: 1,
-    borderRadius: 14,
     padding: 18,
+    marginBottom: 8,
+    marginRight: 8,
   },
 
   semResultadosTitulo: {
